@@ -18,9 +18,22 @@
               {{ item.title }}
               <span v-if="isLive(item)" class="badge">進行中</span>
             </div>
+            <div v-if="item.attachments?.length" class="atts">
+              <template v-for="a in item.attachments" :key="a.id">
+                <a v-if="isImage(a.file_type)" :href="a.file_url" target="_blank" rel="noopener">
+                  <img :src="a.file_url" :alt="a.file_name" class="thumb" />
+                </a>
+                <a v-else :href="a.file_url" target="_blank" rel="noopener" class="file-chip">
+                  📎 {{ a.file_name }}
+                </a>
+              </template>
+            </div>
             <div class="who">
               {{ memberName(item.member_id) }}
-              <button v-if="item.member_id === meId" class="del" @click="$emit('remove', item.id)">刪除</button>
+              <template v-if="item.member_id === meId">
+                <button class="del" @click="$emit('edit', item)">編輯</button>
+                <button class="del" @click="$emit('remove', item.id)">刪除</button>
+              </template>
             </div>
           </div>
         </div>
@@ -38,7 +51,9 @@ const props = defineProps({
   members: { type: Array, default: () => [] },
   meId: String,
 })
-defineEmits(['remove'])
+defineEmits(['remove', 'edit'])
+
+const isImage = (t) => t && t.startsWith('image/')
 
 const now = ref(Date.now())
 let timer
@@ -97,6 +112,19 @@ const groups = computed(() => {
   color: var(--text-hi); margin-left: 6px; animation: pulse 1.6s ease-in-out infinite;
 }
 @keyframes pulse { 50% { opacity: 0.5; } }
+.atts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.thumb {
+  width: 56px; height: 56px; object-fit: cover; border-radius: 8px;
+  border: 1px solid var(--glass-border); display: block;
+}
+.file-chip {
+  display: inline-flex; align-items: center; font-size: 12px;
+  padding: 5px 10px; border-radius: 999px; max-width: 200px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  color: var(--text-mid); text-decoration: none;
+}
+.file-chip:hover { color: var(--text-hi); }
 .del {
   background: none; border: none; color: var(--text-lo); font-size: 11px;
   cursor: pointer; text-decoration: underline; padding: 0; font-family: inherit;

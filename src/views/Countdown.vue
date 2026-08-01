@@ -29,11 +29,36 @@
       <section v-if="store.meeting" class="glass hero">
         <div v-if="store.meeting.photo_url && store.meeting.show_photo" class="photo-wrap">
           <img class="photo" :src="store.meeting.photo_url" alt="" />
+          <button v-if="store.me" class="photo-x" title="移除照片" @click="store.removeMeetingPhoto">✕</button>
         </div>
         <div class="label">COUNTDOWN</div>
         <div class="title">{{ store.meeting.title }}</div>
         <BigTimer :target="store.meeting.meet_at" />
         <div class="date">{{ meetAtText }}</div>
+
+        <div v-if="store.meeting.attachments?.length" class="hero-atts">
+          <template v-for="a in store.meeting.attachments" :key="a.id">
+            <a v-if="isImage(a.file_type)" :href="a.file_url" target="_blank" rel="noopener">
+              <img :src="a.file_url" :alt="a.file_name" class="hero-thumb" />
+            </a>
+            <a v-else :href="a.file_url" target="_blank" rel="noopener" class="hero-file">
+              📎 {{ a.file_name }}
+            </a>
+            <button v-if="store.me" class="att-x" title="刪除附件" @click="store.removeMeetingAttachment(a.id)">✕</button>
+          </template>
+        </div>
+
+        <div v-if="store.me" class="hero-actions">
+          <button class="pill" :disabled="uploading" @click="photoInput.click()">
+            📷 {{ store.meeting.photo_url ? '換封面照片' : '放封面照片' }}
+          </button>
+          <button class="pill" :disabled="uploading" @click="attInput.click()">
+            {{ uploading ? '上傳中…' : '📎 加入附件' }}
+          </button>
+          <input ref="photoInput" type="file" accept="image/*" hidden @change="onPhotoPick" />
+          <input ref="attInput" type="file" multiple hidden @change="onAttPick" />
+        </div>
+        <p v-if="uploadError" class="upload-error">{{ uploadError }}</p>
       </section>
 
       <div class="section-title">
@@ -46,9 +71,15 @@
         :members="store.members"
         :me-id="store.me?.id"
         @remove="store.removeSchedule"
+        @edit="openEdit"
       />
 
-      <ScheduleForm v-if="showForm" @close="showForm = false" @save="onSave" />
+      <ScheduleForm
+        v-if="showForm"
+        :schedule="editingSchedule"
+        @close="closeForm"
+        @save="onSave"
+      />
     </template>
     <p v-else class="loading">載入中…</p>
   </div>
@@ -69,9 +100,16 @@ const store = useRoomStore()
 
 const pageError = ref('')
 const showForm = ref(false)
+const editingSchedule = ref(null)
 const copied = ref(false)
 const nickname = ref('')
 const joining = ref(false)
+const photoInput = ref()
+const attInput = ref()
+const uploading = ref(false)
+const uploadError = ref('')
+
+const isImage = (t) => t && t.startsWith('image/')
 
 const meetAtText = computed(() =>
   store.meeting ? dayjs(store.meeting.meet_at).format('YYYY/M/D（dd）HH:mm') : '')
@@ -119,7 +157,47 @@ async function join() {
 }
 
 function onSave(payload) {
-  store.addSchedule(payload).then(payload.resolve, payload.reject)
+  store.saveSchedule(payload).then(payload.resolve, payload.reject)
+}
+
+function openEdit(schedule) {
+  editingSchedule.value = schedule
+  showForm.value = true
+}
+
+function closeForm() {
+  showForm.value = false
+  editingSchedule.value = null
+}
+
+async function onPhotoPick(e) {
+  const file = e.target.files[0]
+  e.target.value = ''
+  if (!file) return
+  uploading.value = true
+  uploadError.value = ''
+  try {
+    await store.setMeetingPhoto(file)
+  } catch (err) {
+    uploadError.value = err.message || '上傳失敗'
+  } finally {
+    uploading.value = false
+  }
+}
+
+async function onAttPick(e) {
+  const files = [...e.target.files]
+  e.target.value = ''
+  if (!files.length) return
+  uploading.value = true
+  uploadError.value = ''
+  try {
+    await store.addMeetingFiles(files)
+  } catch (err) {
+    uploadError.value = err.message || '上傳失敗'
+  } finally {
+    uploading.value = false
+  }
 }
 </script>
 
@@ -139,7 +217,36 @@ header { display: flex; align-items: center; justify-content: space-between; mar
 .join-form { display: flex; gap: 10px; }
 .join-form .field { width: 150px; padding: 8px 12px; }
 .hero { padding: 30px 28px 32px; text-align: center; margin-bottom: 20px; }
-.photo-wrap { margin-bottom: 20px; }
+.photo-wrap { margin-bottom: 20px; position: relative; display: inline-block; }
+.photo-x {
+  position: absolute; top: 0; right: -6px;
+  width: 24px; height: 24px; border-radius: 50%; font-size: 11px;
+  background: rgba(0,0,0,0.5); color: #fff; border: 1px solid var(--glass-border);
+  cursor: pointer;
+}
+.hero-atts {
+  display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+  margin-top: 16px; align-items: center;
+}
+.hero-thumb {
+  width: 64px; height: 64px; object-fit: cover; border-radius: 10px;
+  border: 1px solid var(--glass-border); display: block;
+}
+.hero-file {
+  display: inline-flex; align-items: center; font-size: 12px;
+  padding: 6px 12px; border-radius: 999px; max-width: 220px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  color: var(--text-mid); text-decoration: none;
+}
+.hero-file:hover { color: var(--text-hi); }
+.att-x {
+  background: none; border: none; color: var(--text-lo); cursor: pointer;
+  font-size: 11px; padding: 0 2px; margin-right: 6px;
+}
+.att-x:hover { color: #fca5a5; }
+.hero-actions { display: flex; gap: 10px; justify-content: center; margin-top: 18px; }
+.upload-error { margin-top: 10px; font-size: 12px; color: #fca5a5; }
 .photo {
   width: 112px; height: 112px; border-radius: 50%; object-fit: cover;
   border: 3px solid var(--glass-highlight);

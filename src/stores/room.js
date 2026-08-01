@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { supabase } from '../lib/supabase'
 
 const MEMBER_COLORS = ['#7dd3fc', '#f9a8d4', '#c4b5fd', '#86efac', '#fdba74', '#fca5a5', '#67e8f9', '#d9f99d']
+const MAX_FILE_MB = 10
 
 function genCode() {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
@@ -79,38 +80,108 @@ export const useRoomStore = defineStore('room', {
       this.room = room
 
       const identity = this.getIdentity(room.code)
-      const [{ data: members }, { data: meeting }] = await Promise.all([
+      const [{ data: members }] = await Promise.all([
         supabase.from('members').select().eq('room_id', room.id).order('created_at'),
-        supabase.from('meetings').select().eq('room_id', room.id).eq('status', 'active')
-          .order('created_at', { ascending: false }).limit(1).maybeSingle(),
+        this.loadMeeting(room.id),
       ])
       this.members = members || []
-      this.meeting = meeting
-      this.me = identity ? this.members.find((m) => m.id === identity.memberId) || null : null
+      this.me = identity ? (members || []).find((m) => m.id === identity.memberId) || null : null
 
-      if (meeting) await this.loadSchedules()
+      if (this.meeting) await this.loadSchedules()
       this.subscribe()
+    },
+
+    async loadMeeting(roomId = this.room?.id) {
+      const { data } = await supabase
+        .from('meetings').select('*, attachments(*)').eq('room_id', roomId)
+        .eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle()
+      this.meeting = data
     },
 
     async loadSchedules() {
       if (!this.meeting) return
       const { data } = await supabase
-        .from('schedules').select().eq('meeting_id', this.meeting.id).order('start_at')
+        .from('schedules').select('*, attachments(*)')
+        .eq('meeting_id', this.meeting.id).order('start_at')
       this.schedules = data || []
     },
 
-    async addSchedule({ title, startAt, endAt, note }) {
-      if (!this.me) throw new Error('請先加入房間')
-      const { error } = await supabase.from('schedules').insert({
-        meeting_id: this.meeting.id,
-        member_id: this.me.id,
-        title, start_at: startAt, end_at: endAt, note: note || null,
-      })
+    async uploadFile(file, folder) {
+      if (file.size > MAX_FILE_MB * 1024 * 1024) {
+        throw new Error(`檔案「${file.name}」超過 ${MAX_FILE_MB}MB 上限`)
+      }
+      const safeName = file.name.replace(/[^\w.\-]+/g, '_')
+      const path = `${folder}/${crypto.randomUUID()}-${safeName}`
+      const { error } = await supabase.storage.from('attachments').upload(path, file)
       if (error) throw error
+      const { data } = supabase.storage.from('attachments').getPublicUrl(path)
+      return data.publicUrl
+    },
+
+    async saveSchedule({ id, title, startAt, endAt, note, newFiles = [], removeAttachmentIds = [] }) {
+      if (!this.me) throw new Error('請先加入房間')
+      let scheduleId = id
+      if (id) {
+        const { error } = await supabase.from('schedules')
+          .update({ title, start_at: startAt, end_at: endAt, note: note || null })
+          .eq('id', id).eq('member_id', this.me.id)
+        if (error) throw error
+      } else {
+        const { data, error } = await supabase.from('schedules').insert({
+          meeting_id: this.meeting.id,
+          member_id: this.me.id,
+          title, start_at: startAt, end_at: endAt, note: note || null,
+        }).select().single()
+        if (error) throw error
+        scheduleId = data.id
+      }
+
+      for (const file of newFiles) {
+        const url = await this.uploadFile(file, `schedules/${scheduleId}`)
+        await supabase.from('attachments').insert({
+          schedule_id: scheduleId, member_id: this.me.id,
+          file_url: url, file_name: file.name, file_type: file.type,
+        })
+      }
+      if (removeAttachmentIds.length) {
+        await supabase.from('attachments').delete().in('id', removeAttachmentIds)
+      }
+      await this.loadSchedules()
     },
 
     async removeSchedule(id) {
       await supabase.from('schedules').delete().eq('id', id).eq('member_id', this.me?.id)
+    },
+
+    async addMeetingFiles(files) {
+      if (!this.me || !this.meeting) return
+      for (const file of files) {
+        const url = await this.uploadFile(file, `meetings/${this.meeting.id}`)
+        await supabase.from('attachments').insert({
+          meeting_id: this.meeting.id, member_id: this.me.id,
+          file_url: url, file_name: file.name, file_type: file.type,
+        })
+      }
+      await this.loadMeeting()
+    },
+
+    async removeMeetingAttachment(id) {
+      await supabase.from('attachments').delete().eq('id', id)
+      await this.loadMeeting()
+    },
+
+    async setMeetingPhoto(file) {
+      if (!this.meeting) return
+      const url = await this.uploadFile(file, `photos/${this.meeting.id}`)
+      await supabase.from('meetings')
+        .update({ photo_url: url, show_photo: true }).eq('id', this.meeting.id)
+      await this.loadMeeting()
+    },
+
+    async removeMeetingPhoto() {
+      if (!this.meeting) return
+      await supabase.from('meetings').update({ photo_url: null }).eq('id', this.meeting.id)
+      await this.loadMeeting()
     },
 
     async setTheme(theme) {
@@ -124,18 +195,15 @@ export const useRoomStore = defineStore('room', {
         .channel(`room:${this.room.id}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' },
           () => this.loadSchedules())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'attachments' },
+          async () => { await Promise.all([this.loadSchedules(), this.loadMeeting()]) })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `room_id=eq.${this.room.id}` },
           async () => {
             const { data } = await supabase.from('members').select().eq('room_id', this.room.id).order('created_at')
             this.members = data || []
           })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'meetings', filter: `room_id=eq.${this.room.id}` },
-          async () => {
-            const { data } = await supabase.from('meetings').select().eq('room_id', this.room.id)
-              .eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle()
-            this.meeting = data
-            await this.loadSchedules()
-          })
+          async () => { await this.loadMeeting(); await this.loadSchedules() })
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${this.room.id}` },
           (payload) => { this.room = payload.new })
         .subscribe()
