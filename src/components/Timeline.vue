@@ -16,14 +16,16 @@
           >
             <div class="name">
               <button
-                v-if="item.member_id === meId"
+                v-if="meId"
                 class="check" :class="{ checked: item.completed_at }"
                 :title="item.completed_at ? '取消完成' : '標記完成'"
                 @click="$emit('toggle-complete', item)"
               >{{ item.completed_at ? '✓' : '' }}</button>
               <span v-else-if="item.completed_at" class="check checked static">✓</span>
               <span class="name-text">{{ item.title }}</span>
-              <span v-if="item.completed_at" class="badge done-badge">完成</span>
+              <span v-if="item.completed_at" class="badge done-badge">
+                ✓ {{ memberName(item.completed_by) }} 達成
+              </span>
               <span v-else-if="isLive(item)" class="badge">進行中</span>
             </div>
             <div v-if="item.attachments?.length" class="atts">
@@ -38,8 +40,8 @@
             </div>
             <div class="who">
               {{ memberName(item.member_id) }}
+              <button v-if="meId" class="del" @click="$emit('attach', item)">📷 傳照片</button>
               <template v-if="item.member_id === meId">
-                <button class="del" @click="$emit('attach', item)">📷 傳照片</button>
                 <button class="del" @click="$emit('edit', item)">編輯</button>
                 <button class="del" @click="$emit('remove', item.id)">刪除</button>
               </template>

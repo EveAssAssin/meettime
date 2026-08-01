@@ -3,6 +3,13 @@ import { supabase } from '../lib/supabase'
 
 const MEMBER_COLORS = ['#7dd3fc', '#f9a8d4', '#c4b5fd', '#86efac', '#fdba74', '#fca5a5', '#67e8f9', '#d9f99d']
 const MAX_FILE_MB = 10
+const VAPID_PUBLIC_KEY = 'BIdxHssc7gPPjaLQBUhUi9d3Up7uPTcCjhyzUVlNSFSpQWbeF7ZScd3oAQgvJBvYK9JBRZHm4EBL_IUEbogktfE'
+
+function urlB64ToUint8Array(base64) {
+  const padding = '='.repeat((4 - (base64.length % 4)) % 4)
+  const raw = atob((base64 + padding).replace(/-/g, '+').replace(/_/g, '/'))
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)))
+}
 
 function genCode() {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
@@ -195,11 +202,50 @@ export const useRoomStore = defineStore('room', {
     },
 
     async toggleComplete(schedule) {
-      if (!this.me || schedule.member_id !== this.me.id) return
-      const completed_at = schedule.completed_at ? null : new Date().toISOString()
-      await supabase.from('schedules').update({ completed_at })
-        .eq('id', schedule.id).eq('member_id', this.me.id)
+      if (!this.me) return
+      const completing = !schedule.completed_at
+      await supabase.from('schedules').update({
+        completed_at: completing ? new Date().toISOString() : null,
+        completed_by: completing ? this.me.id : null,
+      }).eq('id', schedule.id)
       await this.loadSchedules()
+      if (completing) {
+        this.sendPush(`${this.me.nickname} 完成了「${schedule.title}」✓`)
+      }
+    },
+
+    sendPush(body, title = 'MeetTime') {
+      if (!this.room) return
+      supabase.functions.invoke('push', {
+        body: {
+          room_id: this.room.id,
+          actor_member_id: this.me?.id,
+          title,
+          body,
+          url: `/r/${this.room.code}`,
+        },
+      }).catch(() => { /* 推播失敗不影響主流程 */ })
+    },
+
+    async subscribePush() {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        throw new Error('此瀏覽器不支援推播（iPhone 需先加入主畫面再開啟）')
+      }
+      const perm = await Notification.requestPermission()
+      if (perm !== 'granted') return perm
+      const reg = await navigator.serviceWorker.ready
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY),
+      })
+      const json = sub.toJSON()
+      await supabase.from('push_subscriptions').upsert({
+        room_id: this.room.id,
+        member_id: this.me?.id || null,
+        endpoint: json.endpoint,
+        keys: json.keys,
+      }, { onConflict: 'endpoint' })
+      return 'granted'
     },
 
     async removeSchedule(id) {

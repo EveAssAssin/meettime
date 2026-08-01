@@ -1,4 +1,4 @@
-const CACHE = 'meettime-v1'
+const CACHE = 'meettime-v2'
 
 self.addEventListener('install', (e) => {
   self.skipWaiting()
@@ -23,5 +23,31 @@ self.addEventListener('fetch', (e) => {
         return res
       })
       .catch(() => caches.match(e.request).then((r) => r || caches.match('/')))
+  )
+})
+
+self.addEventListener('push', (e) => {
+  let data = {}
+  try { data = e.data.json() } catch { /* ignore */ }
+  e.waitUntil(
+    self.registration.showNotification(data.title || 'MeetTime', {
+      body: data.body || '',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      data: { url: data.url || '/' },
+    })
+  )
+})
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close()
+  const url = e.notification.data?.url || '/'
+  e.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const c of list) {
+        if (c.url.includes(url) && 'focus' in c) return c.focus()
+      }
+      return clients.openWindow(url)
+    })
   )
 })

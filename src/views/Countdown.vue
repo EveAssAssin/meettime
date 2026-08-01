@@ -151,6 +151,9 @@ watch(() => store.room?.theme, (t) => {
 onMounted(async () => {
   try {
     await store.loadRoom(route.params.code)
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      store.subscribePush().catch(() => {})
+    }
   } catch (e) {
     pageError.value = e.message
   }
@@ -224,8 +227,11 @@ async function copyCode() {
 }
 
 async function enableNotif() {
-  if (typeof Notification === 'undefined') return
-  notifState.value = await Notification.requestPermission()
+  try {
+    notifState.value = await store.subscribePush()
+  } catch (e) {
+    uploadError.value = e.message
+  }
 }
 
 function onMeetingSave(payload) {
