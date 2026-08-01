@@ -29,18 +29,30 @@
               <span v-else-if="isLive(item)" class="badge">進行中</span>
             </div>
             <div v-if="item.attachments?.length" class="atts">
-              <template v-for="a in item.attachments" :key="a.id">
-                <a v-if="isImage(a.file_type)" :href="a.file_url" target="_blank" rel="noopener">
-                  <img :src="a.file_url" :alt="a.file_name" class="thumb" />
-                </a>
+              <template v-for="(a, ai) in item.attachments" :key="a.id">
+                <img
+                  v-if="isImage(a.file_type)"
+                  :src="a.file_url" :alt="a.file_name" class="thumb"
+                  @click="$emit('preview', imageList(item), imageIndex(item, ai))"
+                />
                 <a v-else :href="a.file_url" target="_blank" rel="noopener" class="file-chip">
                   📎 {{ a.file_name }}
                 </a>
               </template>
             </div>
+            <div class="reactions">
+              <button
+                v-for="e in EMOJIS" :key="e"
+                class="react"
+                :class="{ mine: mineReacted(item, e), has: reactCount(item, e) > 0 }"
+                :disabled="!meId"
+                @click="$emit('react', item, e)"
+              >{{ e }}<span v-if="reactCount(item, e)" class="rc">{{ reactCount(item, e) }}</span></button>
+            </div>
             <div class="who">
               {{ memberName(item.member_id) }}
               <button v-if="meId" class="del" @click="$emit('attach', item)">📷 傳照片</button>
+              <button v-if="hasImages(item)" class="del" @click="$emit('share', item)">✨ 美照</button>
               <template v-if="item.member_id === meId">
                 <button class="del" @click="$emit('edit', item)">編輯</button>
                 <button class="del" @click="$emit('remove', item.id)">刪除</button>
@@ -62,9 +74,16 @@ const props = defineProps({
   members: { type: Array, default: () => [] },
   meId: String,
 })
-defineEmits(['remove', 'edit', 'toggle-complete', 'attach'])
+defineEmits(['remove', 'edit', 'toggle-complete', 'attach', 'react', 'preview', 'share'])
 
+const EMOJIS = ['❤️', '👍', '😂', '🎉', '😭']
 const isImage = (t) => t && t.startsWith('image/')
+const imageList = (item) => (item.attachments || []).filter((a) => isImage(a.file_type))
+const imageIndex = (item, ai) => imageList(item).findIndex((a) => a.id === item.attachments[ai].id)
+const hasImages = (item) => imageList(item).length > 0
+const reactCount = (item, e) => (item.schedule_reactions || []).filter((r) => r.emoji === e).length
+const mineReacted = (item, e) =>
+  (item.schedule_reactions || []).some((r) => r.emoji === e && r.member_id === props.meId)
 
 const now = ref(Date.now())
 let timer
@@ -142,8 +161,20 @@ const groups = computed(() => {
 .atts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .thumb {
   width: 56px; height: 56px; object-fit: cover; border-radius: 8px;
-  border: 1px solid var(--glass-border); display: block;
+  border: 1px solid var(--glass-border); display: block; cursor: zoom-in;
 }
+.reactions { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+.react {
+  background: none; border: 1px solid transparent; border-radius: 999px;
+  font-size: 13px; padding: 2px 7px; cursor: pointer; opacity: 0.35;
+  transition: 0.15s; display: inline-flex; align-items: center; gap: 3px;
+  font-family: inherit; color: var(--text-mid);
+}
+.react.has { opacity: 1; background: var(--glass-bg); border-color: var(--glass-border); }
+.react.mine { border-color: var(--accent); opacity: 1; }
+.react:hover:not(:disabled) { opacity: 1; transform: scale(1.1); }
+.react:disabled { cursor: default; }
+.rc { font-size: 11px; font-weight: 600; }
 .file-chip {
   display: inline-flex; align-items: center; font-size: 12px;
   padding: 5px 10px; border-radius: 999px; max-width: 200px;

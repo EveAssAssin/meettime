@@ -108,7 +108,7 @@ export const useRoomStore = defineStore('room', {
     async loadSchedules() {
       if (!this.meeting) return
       const { data } = await supabase
-        .from('schedules').select('*, attachments(*)')
+        .from('schedules').select('*, attachments(*), schedule_reactions(*)')
         .eq('meeting_id', this.meeting.id).order('start_at')
       const list = data || []
       this.notifyNewlyCompleted(list)
@@ -136,7 +136,26 @@ export const useRoomStore = defineStore('room', {
       this._completedMap = map
     },
 
-    async uploadFile(file, folder) {
+    async compressImage(file) {
+      if (!file.type.startsWith('image/') || file.type === 'image/gif') return file
+      try {
+        const img = await createImageBitmap(file)
+        const MAX = 1600
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height))
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.round(img.width * scale)
+        canvas.height = Math.round(img.height * scale)
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+        const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.85))
+        if (!blob || blob.size >= file.size) return file
+        return new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' })
+      } catch {
+        return file
+      }
+    },
+
+    async uploadFile(rawFile, folder) {
+      const file = await this.compressImage(rawFile)
       if (file.size > MAX_FILE_MB * 1024 * 1024) {
         throw new Error(`檔案「${file.name}」超過 ${MAX_FILE_MB}MB 上限`)
       }
@@ -175,6 +194,20 @@ export const useRoomStore = defineStore('room', {
       }
       if (removeAttachmentIds.length) {
         await supabase.from('attachments').delete().in('id', removeAttachmentIds)
+      }
+      await this.loadSchedules()
+    },
+
+    async toggleReaction(schedule, emoji) {
+      if (!this.me) return
+      const existing = (schedule.schedule_reactions || [])
+        .find((r) => r.member_id === this.me.id && r.emoji === emoji)
+      if (existing) {
+        await supabase.from('schedule_reactions').delete().eq('id', existing.id)
+      } else {
+        await supabase.from('schedule_reactions').insert({
+          schedule_id: schedule.id, member_id: this.me.id, emoji,
+        })
       }
       await this.loadSchedules()
     },
@@ -296,6 +329,8 @@ export const useRoomStore = defineStore('room', {
           () => this.loadSchedules())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'attachments' },
           async () => { await Promise.all([this.loadSchedules(), this.loadMeeting()]) })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_reactions' },
+          () => this.loadSchedules())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `room_id=eq.${this.room.id}` },
           async () => {
             const { data } = await supabase.from('members').select().eq('room_id', this.room.id).order('created_at')

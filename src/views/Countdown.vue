@@ -51,9 +51,12 @@
 
         <div v-if="store.meeting.attachments?.length" class="hero-atts">
           <template v-for="a in store.meeting.attachments" :key="a.id">
-            <a v-if="isImage(a.file_type)" :href="a.file_url" target="_blank" rel="noopener">
-              <img :src="a.file_url" :alt="a.file_name" class="hero-thumb" />
-            </a>
+            <img
+              v-if="isImage(a.file_type)"
+              :src="a.file_url" :alt="a.file_name" class="hero-thumb"
+              style="cursor: zoom-in"
+              @click="openLightbox(store.meeting.attachments.filter(x => isImage(x.file_type)), store.meeting.attachments.filter(x => isImage(x.file_type)).findIndex(x => x.id === a.id))"
+            />
             <a v-else :href="a.file_url" target="_blank" rel="noopener" class="hero-file">
               📎 {{ a.file_name }}
             </a>
@@ -87,6 +90,9 @@
         @edit="openEdit"
         @toggle-complete="store.toggleComplete"
         @attach="openScheduleAttach"
+        @react="store.toggleReaction"
+        @preview="openLightbox"
+        @share="shareTarget = $event"
       />
       <input ref="schedAttInput" type="file" accept="image/*,*/*" multiple hidden @change="onSchedAttPick" />
 
@@ -95,6 +101,22 @@
         :meeting="store.meeting"
         @close="showMeetingForm = false"
         @save="onMeetingSave"
+      />
+
+      <Lightbox
+        v-if="lightbox"
+        :images="lightbox.images"
+        :start="lightbox.start"
+        @close="lightbox = null"
+      />
+
+      <IgShareModal
+        v-if="shareTarget"
+        :schedule="shareTarget"
+        :done-name="doneName(shareTarget)"
+        :room-title="store.meeting?.title || ''"
+        :theme="store.room?.theme || 'midnight'"
+        @close="shareTarget = null"
       />
 
       <ScheduleForm
@@ -118,6 +140,8 @@ import ThemePicker from '../components/ThemePicker.vue'
 import Timeline from '../components/Timeline.vue'
 import ScheduleForm from '../components/ScheduleForm.vue'
 import MeetingForm from '../components/MeetingForm.vue'
+import Lightbox from '../components/Lightbox.vue'
+import IgShareModal from '../components/IgShareModal.vue'
 
 const route = useRoute()
 const store = useRoomStore()
@@ -138,8 +162,20 @@ const copiedText = ref('')
 const attachTarget = ref(null)
 const notifState = ref(typeof Notification !== 'undefined' ? Notification.permission : 'denied')
 
+const lightbox = ref(null)
+const shareTarget = ref(null)
+
 const isImage = (t) => t && t.startsWith('image/')
 const isOwner = computed(() => store.me && store.room?.owner_member_id === store.me.id)
+
+function openLightbox(images, start) {
+  lightbox.value = { images, start: Math.max(0, start) }
+}
+
+function doneName(schedule) {
+  if (!schedule.completed_at) return ''
+  return store.members.find((m) => m.id === schedule.completed_by)?.nickname || ''
+}
 
 const meetAtText = computed(() =>
   store.meeting ? dayjs(store.meeting.meet_at).format('YYYY/M/D（dd）HH:mm') : '')
