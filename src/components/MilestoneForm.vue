@@ -5,12 +5,25 @@
       <p class="hint">倒數會自動指向下一個未到的目標</p>
 
       <div v-for="m in milestones" :key="m.id" class="ms-row" :class="{ passed: isPassed(m) }">
-        <span class="ms-status">{{ isPassed(m) ? '✓' : '•' }}</span>
-        <div class="ms-info">
-          <b>{{ m.title }}</b>
-          <span>{{ fmt(m.target_at) }}</span>
-        </div>
-        <button class="del" @click="$emit('remove', m.id)">刪除</button>
+        <template v-if="editingId === m.id">
+          <div class="edit-fields">
+            <input v-model="editTitle" class="field" maxlength="20" />
+            <input v-model="editTargetAt" class="field" type="datetime-local" />
+            <div class="edit-actions">
+              <button class="pill sm" @click="editingId = null">取消</button>
+              <button class="pill sm primary" :disabled="loading" @click="saveEdit(m)">儲存</button>
+            </div>
+          </div>
+        </template>
+        <template v-else>
+          <span class="ms-status">{{ isPassed(m) ? '✓' : '•' }}</span>
+          <div class="ms-info">
+            <b>{{ m.title }}</b>
+            <span>{{ fmt(m.target_at) }}</span>
+          </div>
+          <button class="del" @click="startEdit(m)">編輯</button>
+          <button class="del" @click="$emit('remove', m.id)">刪除</button>
+        </template>
       </div>
 
       <form class="add-form" @submit.prevent="add">
@@ -32,12 +45,41 @@ import { ref } from 'vue'
 import { dayjs } from '../lib/time'
 
 defineProps({ milestones: { type: Array, default: () => [] } })
-const emit = defineEmits(['close', 'add', 'remove'])
+const emit = defineEmits(['close', 'add', 'remove', 'update'])
 
 const title = ref('')
 const targetAt = ref('')
 const loading = ref(false)
 const error = ref('')
+const editingId = ref(null)
+const editTitle = ref('')
+const editTargetAt = ref('')
+
+function startEdit(m) {
+  editingId.value = m.id
+  editTitle.value = m.title
+  editTargetAt.value = dayjs(m.target_at).format('YYYY-MM-DDTHH:mm')
+}
+
+async function saveEdit(m) {
+  loading.value = true
+  error.value = ''
+  try {
+    await new Promise((resolve, reject) => {
+      emit('update', {
+        id: m.id,
+        title: editTitle.value.trim(),
+        targetAt: new Date(editTargetAt.value).toISOString(),
+        resolve, reject,
+      })
+    })
+    editingId.value = null
+  } catch (e) {
+    error.value = e.message || '儲存失敗'
+  } finally {
+    loading.value = false
+  }
+}
 
 const fmt = (d) => dayjs(d).format('YYYY/M/D（dd）HH:mm')
 const isPassed = (m) => new Date(m.target_at) <= new Date()
@@ -89,6 +131,9 @@ h3 { font-size: 17px; margin-bottom: 4px; }
 }
 .del:hover { color: #fca5a5; }
 .add-form { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.edit-fields { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.edit-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.pill.sm { font-size: 12px; padding: 5px 14px; }
 .actions { display: flex; justify-content: flex-end; margin-top: 18px; }
 .error { margin-top: 10px; font-size: 13px; color: #fca5a5; }
 </style>

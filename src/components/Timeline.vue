@@ -8,6 +8,14 @@
           <time>{{ nowText }}</time>
           <div class="bar" />
         </div>
+        <div v-else-if="item.gapAdd" class="gap-row">
+          <span />
+          <button
+            v-if="meId" class="gap-btn"
+            :title="`快速新增 ${fmt(item.startAt)}–${fmt(item.endAt)}`"
+            @click="$emit('quick-add', { startAt: item.startAt, endAt: item.endAt })"
+          >＋ {{ fmt(item.startAt) }}–{{ fmt(item.endAt) }} 插入行程</button>
+        </div>
         <div v-else class="slot">
           <time>{{ fmt(item.start_at) }}–{{ fmt(item.end_at) }}</time>
           <div
@@ -74,7 +82,7 @@ const props = defineProps({
   members: { type: Array, default: () => [] },
   meId: String,
 })
-defineEmits(['remove', 'edit', 'toggle-complete', 'attach', 'react', 'preview', 'share'])
+defineEmits(['remove', 'edit', 'toggle-complete', 'attach', 'react', 'preview', 'share', 'quick-add'])
 
 const EMOJIS = ['❤️', '👍', '😂', '🎉', '😭']
 const isImage = (t) => t && t.startsWith('image/')
@@ -92,6 +100,7 @@ onUnmounted(() => clearInterval(timer))
 
 const nowText = computed(() => dayjs(now.value).format('HH:mm'))
 const fmt = (d) => dayjs(d).format('HH:mm')
+
 const isLive = (s) => now.value >= +new Date(s.start_at) && now.value < +new Date(s.end_at)
 
 const memberColor = (id) => props.members.find((m) => m.id === id)?.color || 'var(--accent)'
@@ -108,13 +117,24 @@ const groups = computed(() => {
   return [...byDay.entries()].map(([key, items]) => {
     const out = []
     let inserted = false
-    for (const item of items) {
+    items.forEach((item, i) => {
+      if (i > 0) {
+        const prevEnd = items[i - 1].end_at
+        if (new Date(item.start_at) - new Date(prevEnd) >= 5 * 60 * 1000) {
+          out.push({
+            gapAdd: true,
+            id: `gap-${items[i - 1].id}`,
+            startAt: prevEnd,
+            endAt: item.start_at,
+          })
+        }
+      }
       if (key === todayKey && !inserted && +new Date(item.start_at) > now.value) {
         out.push({ nowline: true, id: 'nowline' })
         inserted = true
       }
       out.push(item)
-    }
+    })
     if (key === todayKey && !inserted) out.push({ nowline: true, id: 'nowline' })
     return { label: dayLabel(items[0].start_at), items: out }
   })
@@ -188,6 +208,13 @@ const groups = computed(() => {
   cursor: pointer; text-decoration: underline; padding: 0; font-family: inherit;
 }
 .del:hover { color: #fca5a5; }
+.gap-row { display: grid; grid-template-columns: 86px 1fr; gap: 12px; margin: 2px 0 10px; }
+.gap-btn {
+  border: 1px dashed var(--glass-border); background: none; border-radius: 10px;
+  color: var(--text-lo); font-size: 12px; padding: 5px 10px; cursor: pointer;
+  font-family: inherit; transition: 0.15s; text-align: center;
+}
+.gap-btn:hover { color: var(--accent); border-color: var(--accent); }
 .nowline { display: grid; grid-template-columns: 86px 1fr; gap: 12px; align-items: center; margin: 6px 0; }
 .nowline time { font-size: 12px; color: var(--accent); font-weight: 600; }
 .nowline .bar {

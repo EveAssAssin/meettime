@@ -51,14 +51,32 @@
 import { ref, computed } from 'vue'
 import { dayjs } from '../lib/time'
 
-const props = defineProps({ schedule: { type: Object, default: null } })
+const props = defineProps({
+  schedule: { type: Object, default: null },
+  prefill: { type: Object, default: null },
+})
 const emit = defineEmits(['close', 'save'])
 
 const toLocal = (d) => dayjs(d).format('YYYY-MM-DDTHH:mm')
 
+const initStart = () => {
+  if (props.schedule) return toLocal(props.schedule.start_at)
+  if (props.prefill?.startAt) return toLocal(props.prefill.startAt)
+  return dayjs().add(1, 'hour').startOf('hour').format('YYYY-MM-DDTHH:mm')
+}
+const initEnd = () => {
+  if (props.schedule) return toLocal(props.schedule.end_at)
+  if (props.prefill?.endAt) {
+    const s = new Date(props.prefill.startAt)
+    const e = new Date(props.prefill.endAt)
+    return toLocal(e > s ? e : new Date(s.getTime() + 3600000))
+  }
+  return dayjs().add(2, 'hour').startOf('hour').format('YYYY-MM-DDTHH:mm')
+}
+
 const title = ref(props.schedule?.title || '')
-const startAt = ref(props.schedule ? toLocal(props.schedule.start_at) : dayjs().add(1, 'hour').startOf('hour').format('YYYY-MM-DDTHH:mm'))
-const endAt = ref(props.schedule ? toLocal(props.schedule.end_at) : dayjs().add(2, 'hour').startOf('hour').format('YYYY-MM-DDTHH:mm'))
+const startAt = ref(initStart())
+const endAt = ref(initEnd())
 const note = ref(props.schedule?.note || '')
 const newFiles = ref([])
 const removeIds = ref([])

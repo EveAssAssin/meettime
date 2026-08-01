@@ -150,6 +150,7 @@
         @react="store.toggleReaction"
         @preview="openLightbox"
         @share="shareTarget = $event"
+        @quick-add="onQuickAdd"
       />
       <input ref="schedAttInput" type="file" accept="image/*,*/*" multiple hidden @change="onSchedAttPick" />
 
@@ -166,6 +167,7 @@
         @close="showMilestones = false"
         @add="onMilestoneAdd"
         @remove="onMilestoneRemove"
+        @update="onMilestoneUpdate"
       />
 
       <Lightbox
@@ -187,6 +189,7 @@
       <ScheduleForm
         v-if="showForm"
         :schedule="editingSchedule"
+        :prefill="formPrefill"
         @close="closeForm"
         @save="onSave"
       />
@@ -217,6 +220,7 @@ const auth = useAuthStore()
 const pageError = ref('')
 const showForm = ref(false)
 const editingSchedule = ref(null)
+const formPrefill = ref(null)
 const copied = ref(false)
 const nickname = ref('')
 const joining = ref(false)
@@ -264,6 +268,10 @@ const msDate = (m) => dayjs(m.target_at).format('M/D')
 
 function onMilestoneAdd(payload) {
   store.addMilestone(payload).then(payload.resolve, payload.reject)
+}
+
+function onMilestoneUpdate(payload) {
+  store.updateMilestone(payload).then(payload.resolve, payload.reject)
 }
 
 async function onMilestoneRemove(id) {
@@ -332,9 +340,16 @@ function openEdit(schedule) {
   showForm.value = true
 }
 
+function onQuickAdd(range) {
+  formPrefill.value = range
+  editingSchedule.value = null
+  showForm.value = true
+}
+
 function closeForm() {
   showForm.value = false
   editingSchedule.value = null
+  formPrefill.value = null
 }
 
 async function onPhotoPick(e) {
