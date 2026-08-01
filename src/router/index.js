@@ -6,5 +6,6 @@ export default createRouter({
     { path: '/', name: 'home', component: () => import('../views/Home.vue') },
     { path: '/r/:code', name: 'countdown', component: () => import('../views/Countdown.vue') },
     { path: '/r/:code/widget', name: 'widget', component: () => import('../views/Widget.vue') },
+    { path: '/r/:code/memories', name: 'memories', component: () => import('../views/Memories.vue') },
   ],
 })

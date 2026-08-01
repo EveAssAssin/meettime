@@ -29,6 +29,16 @@ export const useRoomStore = defineStore('room', {
   }),
   getters: {
     memberById: (s) => (id) => s.members.find((m) => m.id === id),
+    milestones: (s) => s.meeting?.milestones || [],
+    nextMilestone() {
+      return this.milestones.find((m) => new Date(m.target_at) > new Date()) || null
+    },
+    journeyDone() {
+      return this.milestones.length > 0 && !this.nextMilestone
+    },
+    countdownTarget() {
+      return this.nextMilestone?.target_at || this.meeting?.meet_at || null
+    },
   },
   actions: {
     async createRoom({ nickname, title, meetAt }) {
@@ -100,8 +110,11 @@ export const useRoomStore = defineStore('room', {
 
     async loadMeeting(roomId = this.room?.id) {
       const { data } = await supabase
-        .from('meetings').select('*, attachments(*)').eq('room_id', roomId)
+        .from('meetings').select('*, attachments(*), milestones(*)').eq('room_id', roomId)
         .eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle()
+      if (data?.milestones) {
+        data.milestones.sort((a, b) => new Date(a.target_at) - new Date(b.target_at))
+      }
       this.meeting = data
     },
 
@@ -210,6 +223,44 @@ export const useRoomStore = defineStore('room', {
         })
       }
       await this.loadSchedules()
+    },
+
+    async syncMeetAt() {
+      const next = this.milestones.find((m) => new Date(m.target_at) > new Date())
+      const target = next?.target_at || this.milestones.at(-1)?.target_at
+      if (target && target !== this.meeting.meet_at) {
+        await supabase.from('meetings').update({ meet_at: target }).eq('id', this.meeting.id)
+      }
+    },
+
+    async addMilestone({ title, targetAt }) {
+      if (!this.me || this.room.owner_member_id !== this.me.id) {
+        throw new Error('只有房間建立者可以修改里程碑')
+      }
+      const { error } = await supabase.from('milestones')
+        .insert({ meeting_id: this.meeting.id, title, target_at: targetAt })
+      if (error) throw error
+      await this.loadMeeting()
+      await this.syncMeetAt()
+    },
+
+    async removeMilestone(id) {
+      if (!this.me || this.room.owner_member_id !== this.me.id) return
+      if (this.milestones.length <= 1) throw new Error('至少要保留一個里程碑')
+      await supabase.from('milestones').delete().eq('id', id)
+      await this.loadMeeting()
+      await this.syncMeetAt()
+    },
+
+    async updateMilestone({ id, title, targetAt }) {
+      if (!this.me || this.room.owner_member_id !== this.me.id) {
+        throw new Error('只有房間建立者可以修改里程碑')
+      }
+      const { error } = await supabase.from('milestones')
+        .update({ title, target_at: targetAt }).eq('id', id)
+      if (error) throw error
+      await this.loadMeeting()
+      await this.syncMeetAt()
     },
 
     async updateMeeting({ title, meetAt }) {
@@ -331,6 +382,8 @@ export const useRoomStore = defineStore('room', {
           async () => { await Promise.all([this.loadSchedules(), this.loadMeeting()]) })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_reactions' },
           () => this.loadSchedules())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'milestones' },
+          () => this.loadMeeting())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `room_id=eq.${this.room.id}` },
           async () => {
             const { data } = await supabase.from('members').select().eq('room_id', this.room.id).order('created_at')

@@ -46,8 +46,29 @@
             @click="showMeetingForm = true"
           >✎</button>
         </div>
-        <BigTimer :target="store.meeting.meet_at" />
-        <div class="date">{{ meetAtText }}</div>
+
+        <template v-if="store.journeyDone">
+          <div class="journey-done">🎉 旅程完成！</div>
+          <router-link class="pill primary memories-link" :to="`/r/${store.room.code}/memories`">
+            📖 打開回憶錄
+          </router-link>
+        </template>
+        <template v-else>
+          <div v-if="store.nextMilestone" class="next-ms">距離「{{ store.nextMilestone.title }}」</div>
+          <BigTimer :target="store.countdownTarget" />
+          <div class="date">{{ meetAtText }}</div>
+        </template>
+
+        <div v-if="store.milestones.length > 1 || isOwner" class="ms-chips">
+          <span
+            v-for="m in store.milestones" :key="m.id"
+            class="ms-chip"
+            :class="{ passed: new Date(m.target_at) <= now, next: m.id === store.nextMilestone?.id }"
+          >
+            {{ new Date(m.target_at) <= now ? '✓ ' : '' }}{{ m.title }} {{ msDate(m) }}
+          </span>
+          <button v-if="isOwner" class="pill ms-manage" @click="showMilestones = true">⚑ 管理</button>
+        </div>
 
         <div v-if="store.meeting.attachments?.length" class="hero-atts">
           <template v-for="a in store.meeting.attachments" :key="a.id">
@@ -78,8 +99,11 @@
       </section>
 
       <div class="section-title">
-        <h2>等待的行程</h2>
-        <button v-if="store.me" class="pill" @click="showForm = true">＋ 新增行程</button>
+        <h2>{{ store.journeyDone ? '旅程紀錄' : '等待的行程' }}</h2>
+        <div class="section-actions">
+          <router-link class="pill" :to="`/r/${store.room.code}/memories`">📖 回憶錄</router-link>
+          <button v-if="store.me" class="pill" @click="showForm = true">＋ 新增行程</button>
+        </div>
       </div>
 
       <Timeline
@@ -101,6 +125,14 @@
         :meeting="store.meeting"
         @close="showMeetingForm = false"
         @save="onMeetingSave"
+      />
+
+      <MilestoneForm
+        v-if="showMilestones"
+        :milestones="store.milestones"
+        @close="showMilestones = false"
+        @add="onMilestoneAdd"
+        @remove="onMilestoneRemove"
       />
 
       <Lightbox
@@ -142,6 +174,7 @@ import ScheduleForm from '../components/ScheduleForm.vue'
 import MeetingForm from '../components/MeetingForm.vue'
 import Lightbox from '../components/Lightbox.vue'
 import IgShareModal from '../components/IgShareModal.vue'
+import MilestoneForm from '../components/MilestoneForm.vue'
 
 const route = useRoute()
 const store = useRoomStore()
@@ -164,6 +197,9 @@ const notifState = ref(typeof Notification !== 'undefined' ? Notification.permis
 
 const lightbox = ref(null)
 const shareTarget = ref(null)
+const showMilestones = ref(false)
+const now = ref(new Date())
+let nowTimer
 
 const isImage = (t) => t && t.startsWith('image/')
 const isOwner = computed(() => store.me && store.room?.owner_member_id === store.me.id)
@@ -178,13 +214,28 @@ function doneName(schedule) {
 }
 
 const meetAtText = computed(() =>
-  store.meeting ? dayjs(store.meeting.meet_at).format('YYYY/M/D（dd）HH:mm') : '')
+  store.countdownTarget ? dayjs(store.countdownTarget).format('YYYY/M/D（dd）HH:mm') : '')
+
+const msDate = (m) => dayjs(m.target_at).format('M/D')
+
+function onMilestoneAdd(payload) {
+  store.addMilestone(payload).then(payload.resolve, payload.reject)
+}
+
+async function onMilestoneRemove(id) {
+  try {
+    await store.removeMilestone(id)
+  } catch (e) {
+    uploadError.value = e.message
+  }
+}
 
 watch(() => store.room?.theme, (t) => {
   if (t) document.body.dataset.theme = t
 }, { immediate: true })
 
 onMounted(async () => {
+  nowTimer = setInterval(() => { now.value = new Date() }, 30000)
   try {
     await store.loadRoom(route.params.code)
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
@@ -196,6 +247,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  clearInterval(nowTimer)
   store.unsubscribe()
   document.body.dataset.theme = 'midnight'
 })
@@ -372,7 +424,24 @@ header { display: flex; align-items: center; justify-content: space-between; mar
 .label { font-size: 13px; color: var(--text-mid); letter-spacing: 4px; margin-bottom: 6px; }
 .title { font-size: 22px; font-weight: 600; margin-bottom: 22px; }
 .date { margin-top: 20px; font-size: 13px; color: var(--text-mid); }
-.section-title { display: flex; align-items: center; justify-content: space-between; margin: 26px 4px 12px; }
+.section-title { display: flex; align-items: center; justify-content: space-between; margin: 26px 4px 12px; flex-wrap: wrap; gap: 8px; }
 .section-title h2 { font-size: 15px; font-weight: 600; color: var(--text-mid); letter-spacing: 1px; }
+.section-actions { display: flex; gap: 8px; }
+.section-actions .pill { text-decoration: none; }
+.journey-done { font-size: 36px; font-weight: 700; padding: 18px 0 8px; }
+.memories-link { display: inline-block; text-decoration: none; margin-top: 8px; padding: 10px 22px; }
+.next-ms { font-size: 14px; color: var(--text-mid); margin-bottom: 12px; }
+.ms-chips {
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+  margin-top: 18px; align-items: center;
+}
+.ms-chip {
+  font-size: 12px; padding: 5px 12px; border-radius: 999px;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  color: var(--text-mid);
+}
+.ms-chip.passed { color: #6ee7b7; border-color: rgba(34,197,94,0.4); }
+.ms-chip.next { color: var(--text-hi); border-color: var(--accent); }
+.ms-manage { font-size: 12px; padding: 5px 12px; }
 .loading, .page-error { text-align: center; padding-top: 20vh; color: var(--text-mid); }
 </style>
