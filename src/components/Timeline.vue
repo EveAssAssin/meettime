@@ -39,6 +39,7 @@
             <div class="who">
               {{ memberName(item.member_id) }}
               <template v-if="item.member_id === meId">
+                <button class="del" @click="$emit('attach', item)">📷 傳照片</button>
                 <button class="del" @click="$emit('edit', item)">編輯</button>
                 <button class="del" @click="$emit('remove', item.id)">刪除</button>
               </template>
@@ -59,7 +60,7 @@ const props = defineProps({
   members: { type: Array, default: () => [] },
   meId: String,
 })
-defineEmits(['remove', 'edit', 'toggle-complete'])
+defineEmits(['remove', 'edit', 'toggle-complete', 'attach'])
 
 const isImage = (t) => t && t.startsWith('image/')
 

@@ -103,7 +103,30 @@ export const useRoomStore = defineStore('room', {
       const { data } = await supabase
         .from('schedules').select('*, attachments(*)')
         .eq('meeting_id', this.meeting.id).order('start_at')
-      this.schedules = data || []
+      const list = data || []
+      this.notifyNewlyCompleted(list)
+      this.schedules = list
+    },
+
+    notifyNewlyCompleted(list) {
+      const prev = this._completedMap
+      const map = {}
+      for (const s of list) map[s.id] = s.completed_at
+      if (prev && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        for (const s of list) {
+          const wasKnown = s.id in prev
+          if (wasKnown && !prev[s.id] && s.completed_at && s.member_id !== this.me?.id) {
+            const who = this.members.find((m) => m.id === s.member_id)?.nickname || '成員'
+            try {
+              new Notification('MeetTime ✓ 行程完成', {
+                body: `${who} 完成了「${s.title}」`,
+                icon: '/icons/icon-192.png',
+              })
+            } catch { /* ignore */ }
+          }
+        }
+      }
+      this._completedMap = map
     },
 
     async uploadFile(file, folder) {
@@ -145,6 +168,28 @@ export const useRoomStore = defineStore('room', {
       }
       if (removeAttachmentIds.length) {
         await supabase.from('attachments').delete().in('id', removeAttachmentIds)
+      }
+      await this.loadSchedules()
+    },
+
+    async updateMeeting({ title, meetAt }) {
+      if (!this.me || this.room.owner_member_id !== this.me.id) {
+        throw new Error('只有房間建立者可以修改')
+      }
+      const { error } = await supabase.from('meetings')
+        .update({ title, meet_at: meetAt }).eq('id', this.meeting.id)
+      if (error) throw error
+      await this.loadMeeting()
+    },
+
+    async addScheduleFiles(schedule, files) {
+      if (!this.me) return
+      for (const file of files) {
+        const url = await this.uploadFile(file, `schedules/${schedule.id}`)
+        await supabase.from('attachments').insert({
+          schedule_id: schedule.id, member_id: this.me.id,
+          file_url: url, file_name: file.name, file_type: file.type,
+        })
       }
       await this.loadSchedules()
     },
