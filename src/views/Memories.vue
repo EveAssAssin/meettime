@@ -4,8 +4,13 @@
     <template v-else-if="store.room && store.meeting">
       <header>
         <router-link class="back pill" :to="`/r/${store.room.code}`">← 回倒數</router-link>
+        <button class="pill" :disabled="exporting" @click="exportImage">
+          {{ exporting ? '生成中…' : '🖼️ 輸出長圖' }}
+        </button>
       </header>
+      <p v-if="exportError" class="export-error">{{ exportError }}</p>
 
+      <div ref="captureEl" :class="{ exporting }">
       <section class="glass mem-hero">
         <div v-if="store.meeting.photo_url" class="mem-photo-wrap">
           <img :src="store.meeting.photo_url" class="mem-photo" alt="" />
@@ -53,6 +58,7 @@
       </section>
 
       <p v-if="!store.schedules.length" class="empty">還沒有任何紀錄</p>
+      </div>
 
       <Lightbox
         v-if="lightbox"
@@ -66,8 +72,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
+import { toPng } from 'html-to-image'
 import { useRoomStore } from '../stores/room'
 import { dayjs } from '../lib/time'
 import Lightbox from '../components/Lightbox.vue'
@@ -76,6 +83,54 @@ const route = useRoute()
 const store = useRoomStore()
 const pageError = ref('')
 const lightbox = ref(null)
+const captureEl = ref()
+const exporting = ref(false)
+const exportError = ref('')
+
+async function exportImage() {
+  exporting.value = true
+  exportError.value = ''
+  try {
+    const cs = getComputedStyle(document.body)
+    const [b1, b2, b3, pageBg] = ['--b1', '--b2', '--b3', '--page-bg']
+      .map((v) => cs.getPropertyValue(v).trim())
+    captureEl.value.style.background = [
+      `radial-gradient(60% 40% at 15% 5%, ${b1}55, transparent)`,
+      `radial-gradient(55% 35% at 90% 40%, ${b2}55, transparent)`,
+      `radial-gradient(60% 40% at 30% 95%, ${b3}55, transparent)`,
+      pageBg,
+    ].join(', ')
+    captureEl.value.style.padding = '28px 20px'
+    captureEl.value.style.borderRadius = '0'
+    await nextTick()
+
+    const h = captureEl.value.scrollHeight
+    const ratio = Math.min(2, Math.floor((16000 / h) * 10) / 10)
+    const dataUrl = await toPng(captureEl.value, {
+      pixelRatio: Math.max(1, ratio),
+      cacheBust: true,
+    })
+    const blob = await (await fetch(dataUrl)).blob()
+    const file = new File([blob], `meettime-${store.meeting.title}.png`, { type: 'image/png' })
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: store.meeting.title })
+      } catch { /* 使用者取消 */ }
+    } else {
+      const a = document.createElement('a')
+      a.href = dataUrl
+      a.download = file.name
+      a.click()
+    }
+  } catch (e) {
+    exportError.value = '生成失敗：' + (e.message || e)
+  } finally {
+    captureEl.value.style.background = ''
+    captureEl.value.style.padding = ''
+    exporting.value = false
+  }
+}
 
 watch(() => store.room?.theme, (t) => {
   if (t) document.body.dataset.theme = t
@@ -140,8 +195,14 @@ function reactionSummary(s) {
 </script>
 
 <style scoped>
-header { margin-bottom: 16px; }
+header { margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
 .back { text-decoration: none; display: inline-block; }
+.export-error { font-size: 12px; color: #fca5a5; margin-bottom: 10px; }
+.exporting :deep(.glass) {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.exporting :deep(.glass::before) { animation: none; }
 .mem-hero { padding: 34px 28px; text-align: center; margin-bottom: 30px; }
 .mem-photo-wrap { margin-bottom: 18px; }
 .mem-photo {
