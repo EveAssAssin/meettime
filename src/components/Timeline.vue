@@ -11,12 +11,20 @@
         <div v-else class="slot">
           <time>{{ fmt(item.start_at) }}–{{ fmt(item.end_at) }}</time>
           <div
-            class="event" :class="{ live: isLive(item) }"
+            class="event" :class="{ live: isLive(item), done: item.completed_at }"
             :style="{ '--c': memberColor(item.member_id) }"
           >
             <div class="name">
-              {{ item.title }}
-              <span v-if="isLive(item)" class="badge">進行中</span>
+              <button
+                v-if="item.member_id === meId"
+                class="check" :class="{ checked: item.completed_at }"
+                :title="item.completed_at ? '取消完成' : '標記完成'"
+                @click="$emit('toggle-complete', item)"
+              >{{ item.completed_at ? '✓' : '' }}</button>
+              <span v-else-if="item.completed_at" class="check checked static">✓</span>
+              <span class="name-text">{{ item.title }}</span>
+              <span v-if="item.completed_at" class="badge done-badge">完成</span>
+              <span v-else-if="isLive(item)" class="badge">進行中</span>
             </div>
             <div v-if="item.attachments?.length" class="atts">
               <template v-for="a in item.attachments" :key="a.id">
@@ -51,7 +59,7 @@ const props = defineProps({
   members: { type: Array, default: () => [] },
   meId: String,
 })
-defineEmits(['remove', 'edit'])
+defineEmits(['remove', 'edit', 'toggle-complete'])
 
 const isImage = (t) => t && t.startsWith('image/')
 
@@ -103,7 +111,23 @@ const groups = computed(() => {
   background: var(--glass-bg); border: 1px solid var(--glass-border);
   border-left: 3px solid var(--c); border-top-left-radius: 0; border-bottom-left-radius: 0;
 }
-.event .name { font-size: 14px; font-weight: 600; }
+.event .name { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.check {
+  width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0;
+  border: 1.5px solid var(--glass-border); background: var(--glass-bg);
+  color: #fff; font-size: 13px; line-height: 1; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: 0.15s; padding: 0;
+}
+.check:hover { border-color: var(--accent); }
+.check.checked { background: #22c55e; border-color: #22c55e; }
+.check.static { cursor: default; }
+.event.done { opacity: 0.8; }
+.event.done .name-text { text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.done-badge {
+  background: rgba(34,197,94,0.28) !important;
+  animation: none !important;
+}
 .event .who { font-size: 12px; color: var(--text-lo); margin-top: 2px; display: flex; align-items: center; gap: 8px; }
 .event.live { box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 30%, transparent); }
 .badge {

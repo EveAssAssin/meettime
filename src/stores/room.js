@@ -149,6 +149,14 @@ export const useRoomStore = defineStore('room', {
       await this.loadSchedules()
     },
 
+    async toggleComplete(schedule) {
+      if (!this.me || schedule.member_id !== this.me.id) return
+      const completed_at = schedule.completed_at ? null : new Date().toISOString()
+      await supabase.from('schedules').update({ completed_at })
+        .eq('id', schedule.id).eq('member_id', this.me.id)
+      await this.loadSchedules()
+    },
+
     async removeSchedule(id) {
       await supabase.from('schedules').delete().eq('id', id).eq('member_id', this.me?.id)
     },

@@ -72,6 +72,7 @@
         :me-id="store.me?.id"
         @remove="store.removeSchedule"
         @edit="openEdit"
+        @toggle-complete="store.toggleComplete"
       />
 
       <ScheduleForm
