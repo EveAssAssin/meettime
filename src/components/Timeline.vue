@@ -1,0 +1,116 @@
+<template>
+  <section class="glass timeline">
+    <p v-if="!groups.length" class="empty">還沒有行程，點「＋ 新增行程」把等待填滿吧</p>
+    <template v-for="g in groups" :key="g.label">
+      <div class="day">{{ g.label }}</div>
+      <template v-for="item in g.items" :key="item.id">
+        <div v-if="item.nowline" class="nowline">
+          <time>{{ nowText }}</time>
+          <div class="bar" />
+        </div>
+        <div v-else class="slot">
+          <time>{{ fmt(item.start_at) }}–{{ fmt(item.end_at) }}</time>
+          <div
+            class="event" :class="{ live: isLive(item) }"
+            :style="{ '--c': memberColor(item.member_id) }"
+          >
+            <div class="name">
+              {{ item.title }}
+              <span v-if="isLive(item)" class="badge">進行中</span>
+            </div>
+            <div class="who">
+              {{ memberName(item.member_id) }}
+              <button v-if="item.member_id === meId" class="del" @click="$emit('remove', item.id)">刪除</button>
+            </div>
+          </div>
+        </div>
+      </template>
+    </template>
+  </section>
+</template>
+
+<script setup>
+import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { dayjs, dayLabel } from '../lib/time'
+
+const props = defineProps({
+  schedules: { type: Array, default: () => [] },
+  members: { type: Array, default: () => [] },
+  meId: String,
+})
+defineEmits(['remove'])
+
+const now = ref(Date.now())
+let timer
+onMounted(() => { timer = setInterval(() => { now.value = Date.now() }, 30000) })
+onUnmounted(() => clearInterval(timer))
+
+const nowText = computed(() => dayjs(now.value).format('HH:mm'))
+const fmt = (d) => dayjs(d).format('HH:mm')
+const isLive = (s) => now.value >= +new Date(s.start_at) && now.value < +new Date(s.end_at)
+
+const memberColor = (id) => props.members.find((m) => m.id === id)?.color || 'var(--accent)'
+const memberName = (id) => props.members.find((m) => m.id === id)?.nickname || '?'
+
+const groups = computed(() => {
+  const byDay = new Map()
+  for (const s of props.schedules) {
+    const key = dayjs(s.start_at).format('YYYY-MM-DD')
+    if (!byDay.has(key)) byDay.set(key, [])
+    byDay.get(key).push(s)
+  }
+  const todayKey = dayjs(now.value).format('YYYY-MM-DD')
+  return [...byDay.entries()].map(([key, items]) => {
+    const out = []
+    let inserted = false
+    for (const item of items) {
+      if (key === todayKey && !inserted && +new Date(item.start_at) > now.value) {
+        out.push({ nowline: true, id: 'nowline' })
+        inserted = true
+      }
+      out.push(item)
+    }
+    if (key === todayKey && !inserted) out.push({ nowline: true, id: 'nowline' })
+    return { label: dayLabel(items[0].start_at), items: out }
+  })
+})
+</script>
+
+<style scoped>
+.timeline { padding: 22px 20px; }
+.empty { text-align: center; color: var(--text-lo); font-size: 14px; padding: 12px 0; }
+.day { font-size: 13px; color: var(--text-lo); letter-spacing: 1px; margin: 14px 0 10px; }
+.day:first-child { margin-top: 4px; }
+.slot { display: grid; grid-template-columns: 86px 1fr; gap: 12px; margin-bottom: 10px; }
+.slot time { font-size: 12px; color: var(--text-mid); padding-top: 10px; font-variant-numeric: tabular-nums; }
+.event {
+  border-radius: 14px; padding: 10px 14px;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-left: 3px solid var(--c); border-top-left-radius: 0; border-bottom-left-radius: 0;
+}
+.event .name { font-size: 14px; font-weight: 600; }
+.event .who { font-size: 12px; color: var(--text-lo); margin-top: 2px; display: flex; align-items: center; gap: 8px; }
+.event.live { box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 30%, transparent); }
+.badge {
+  display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--text-hi); margin-left: 6px; animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse { 50% { opacity: 0.5; } }
+.del {
+  background: none; border: none; color: var(--text-lo); font-size: 11px;
+  cursor: pointer; text-decoration: underline; padding: 0; font-family: inherit;
+}
+.del:hover { color: #fca5a5; }
+.nowline { display: grid; grid-template-columns: 86px 1fr; gap: 12px; align-items: center; margin: 6px 0; }
+.nowline time { font-size: 12px; color: var(--accent); font-weight: 600; }
+.nowline .bar {
+  height: 2px; border-radius: 2px; position: relative;
+  background: linear-gradient(90deg, var(--accent), transparent);
+}
+.nowline .bar::before {
+  content: ""; position: absolute; left: -4px; top: -3px;
+  width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+}
+</style>

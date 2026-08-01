@@ -1,0 +1,110 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  --glass-bg: rgba(255,255,255,0.07);
+  --glass-border: rgba(255,255,255,0.16);
+  --glass-highlight: rgba(255,255,255,0.35);
+  --text-hi: rgba(255,255,255,0.95);
+  --text-mid: rgba(255,255,255,0.65);
+  --text-lo: rgba(255,255,255,0.4);
+  --page-bg: #0b0d1a;
+  --b1: #4338ca; --b2: #db2777; --b3: #0891b2; --b4: #7c3aed;
+  --accent: #7dd3fc;
+  min-height: 100vh;
+  font-family: "Noto Sans TC", -apple-system, "Segoe UI", sans-serif;
+  background: var(--page-bg);
+  color: var(--text-hi);
+  overflow-x: hidden;
+  transition: background 0.6s;
+}
+
+body[data-theme="sunset"] {
+  --page-bg: #1a0f14;
+  --b1: #ea580c; --b2: #e11d48; --b3: #f59e0b; --b4: #9d174d;
+  --accent: #fdba74;
+}
+body[data-theme="forest"] {
+  --page-bg: #0a1410;
+  --b1: #059669; --b2: #0d9488; --b3: #365314; --b4: #155e75;
+  --accent: #6ee7b7;
+}
+body[data-theme="cream"], body[data-theme="sakura"] {
+  --glass-bg: rgba(255,255,255,0.5);
+  --glass-border: rgba(255,255,255,0.75);
+  --glass-highlight: rgba(255,255,255,0.95);
+}
+body[data-theme="cream"] {
+  --page-bg: #f3ede4;
+  --b1: #fcd34d; --b2: #f9a8d4; --b3: #a7f3d0; --b4: #c7d2fe;
+  --accent: #d97706;
+  --text-hi: rgba(40,35,30,0.92);
+  --text-mid: rgba(40,35,30,0.6);
+  --text-lo: rgba(40,35,30,0.38);
+}
+body[data-theme="sakura"] {
+  --page-bg: #f7eef1;
+  --b1: #f9a8d4; --b2: #fda4af; --b3: #e9d5ff; --b4: #fecdd3;
+  --accent: #db2777;
+  --text-hi: rgba(60,30,45,0.92);
+  --text-mid: rgba(60,30,45,0.6);
+  --text-lo: rgba(60,30,45,0.38);
+}
+
+.aurora { position: fixed; inset: 0; z-index: 0; overflow: hidden; filter: blur(70px) saturate(140%); }
+.aurora span { position: absolute; border-radius: 50%; opacity: 0.55; mix-blend-mode: screen; transition: background 0.6s; }
+body[data-theme="cream"] .aurora span, body[data-theme="sakura"] .aurora span { mix-blend-mode: normal; opacity: 0.65; }
+.aurora .a1 { width: 55vw; height: 55vw; background: var(--b1); top: -18%; left: -12%; animation: drift1 26s ease-in-out infinite alternate; }
+.aurora .a2 { width: 45vw; height: 45vw; background: var(--b2); top: 30%; right: -15%; animation: drift2 32s ease-in-out infinite alternate; }
+.aurora .a3 { width: 40vw; height: 40vw; background: var(--b3); bottom: -15%; left: 20%; animation: drift3 38s ease-in-out infinite alternate; }
+.aurora .a4 { width: 30vw; height: 30vw; background: var(--b4); top: 8%; right: 25%; animation: drift2 44s ease-in-out infinite alternate-reverse; }
+@keyframes drift1 { to { transform: translate(14vw, 10vh) scale(1.15); } }
+@keyframes drift2 { to { transform: translate(-12vw, -8vh) scale(0.9); } }
+@keyframes drift3 { to { transform: translate(10vw, -12vh) scale(1.2); } }
+
+.wrap { position: relative; z-index: 1; max-width: 720px; margin: 0 auto; padding: 24px 20px 60px; }
+
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25), inset 0 1px 0 var(--glass-highlight);
+  position: relative;
+  overflow: hidden;
+}
+.glass::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.1) 45%, transparent 60%);
+  background-size: 250% 100%;
+  animation: sheen 7s linear infinite;
+}
+@keyframes sheen { 0% { background-position: 160% 0; } 100% { background-position: -60% 0; } }
+
+.pill {
+  padding: 8px 16px; border-radius: 999px; font-size: 13px; cursor: pointer;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  color: var(--text-hi); backdrop-filter: blur(10px); transition: 0.2s;
+  font-family: inherit;
+}
+.pill:hover { filter: brightness(1.25); }
+.pill.primary {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  font-weight: 600;
+}
+
+.field {
+  width: 100%; padding: 12px 16px; border-radius: 14px; font-size: 15px;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  color: var(--text-hi); font-family: inherit; outline: none;
+}
+.field::placeholder { color: var(--text-lo); }
+.field:focus { border-color: var(--accent); }
+
+.avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 600; color: #fff;
+  border: 2px solid rgba(255,255,255,0.6);
+}

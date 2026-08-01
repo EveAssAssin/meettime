@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MeetTime — 設計稿（流光玻璃・多主題）</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    --glass-bg: rgba(255,255,255,0.07);
+    --glass-border: rgba(255,255,255,0.16);
+    --glass-highlight: rgba(255,255,255,0.35);
+    --text-hi: rgba(255,255,255,0.95);
+    --text-mid: rgba(255,255,255,0.65);
+    --text-lo: rgba(255,255,255,0.4);
+    --page-bg: #0b0d1a;
+    --b1: #4338ca; --b2: #db2777; --b3: #0891b2; --b4: #7c3aed;
+    --accent: #7dd3fc;
+    --c-me: #7dd3fc; --c-her: #f9a8d4; --c-p3: #c4b5fd; --c-p4: #86efac;
+    min-height: 100vh;
+    font-family: "Noto Sans TC", -apple-system, "Segoe UI", sans-serif;
+    background: var(--page-bg);
+    color: var(--text-hi);
+    overflow-x: hidden;
+    transition: background 0.6s;
+  }
+  body[data-theme="sunset"] {
+    --page-bg: #1a0f14;
+    --b1: #ea580c; --b2: #e11d48; --b3: #f59e0b; --b4: #9d174d;
+    --accent: #fdba74;
+  }
+  body[data-theme="forest"] {
+    --page-bg: #0a1410;
+    --b1: #059669; --b2: #0d9488; --b3: #365314; --b4: #155e75;
+    --accent: #6ee7b7;
+  }
+  body[data-theme="cream"] {
+    --page-bg: #f3ede4;
+    --b1: #fcd34d; --b2: #f9a8d4; --b3: #a7f3d0; --b4: #c7d2fe;
+    --accent: #d97706;
+    --glass-bg: rgba(255,255,255,0.5);
+    --glass-border: rgba(255,255,255,0.75);
+    --glass-highlight: rgba(255,255,255,0.95);
+    --text-hi: rgba(40,35,30,0.92);
+    --text-mid: rgba(40,35,30,0.6);
+    --text-lo: rgba(40,35,30,0.38);
+    --c-me: #0284c7; --c-her: #db2777; --c-p3: #7c3aed; --c-p4: #059669;
+  }
+  body[data-theme="sakura"] {
+    --page-bg: #f7eef1;
+    --b1: #f9a8d4; --b2: #fda4af; --b3: #e9d5ff; --b4: #fecdd3;
+    --accent: #db2777;
+    --glass-bg: rgba(255,255,255,0.5);
+    --glass-border: rgba(255,255,255,0.75);
+    --glass-highlight: rgba(255,255,255,0.95);
+    --text-hi: rgba(60,30,45,0.92);
+    --text-mid: rgba(60,30,45,0.6);
+    --text-lo: rgba(60,30,45,0.38);
+    --c-me: #0284c7; --c-her: #db2777; --c-p3: #7c3aed; --c-p4: #059669;
+  }
+  .aurora { position: fixed; inset: 0; z-index: 0; overflow: hidden; filter: blur(70px) saturate(140%); }
+  .aurora span { position: absolute; border-radius: 50%; opacity: 0.55; mix-blend-mode: screen; transition: background 0.6s; }
+  body[data-theme="cream"] .aurora span, body[data-theme="sakura"] .aurora span { mix-blend-mode: normal; opacity: 0.65; }
+  .aurora .a1 { width: 55vw; height: 55vw; background: var(--b1); top: -18%; left: -12%; animation: drift1 26s ease-in-out infinite alternate; }
+  .aurora .a2 { width: 45vw; height: 45vw; background: var(--b2); top: 30%; right: -15%; animation: drift2 32s ease-in-out infinite alternate; }
+  .aurora .a3 { width: 40vw; height: 40vw; background: var(--b3); bottom: -15%; left: 20%; animation: drift3 38s ease-in-out infinite alternate; }
+  .aurora .a4 { width: 30vw; height: 30vw; background: var(--b4); top: 8%; right: 25%; animation: drift2 44s ease-in-out infinite alternate-reverse; }
+  @keyframes drift1 { to { transform: translate(14vw, 10vh) scale(1.15); } }
+  @keyframes drift2 { to { transform: translate(-12vw, -8vh) scale(0.9); } }
+  @keyframes drift3 { to { transform: translate(10vw, -12vh) scale(1.2); } }
+
+  .wrap { position: relative; z-index: 1; max-width: 720px; margin: 0 auto; padding: 24px 20px 60px; }
+
+  .glass {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    backdrop-filter: blur(22px) saturate(160%);
+    -webkit-backdrop-filter: blur(22px) saturate(160%);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25), inset 0 1px 0 var(--glass-highlight);
+    position: relative; overflow: hidden;
+  }
+  .glass::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.1) 45%, transparent 60%);
+    background-size: 250% 100%;
+    animation: sheen 7s linear infinite;
+  }
+  @keyframes sheen { 0% { background-position: 160% 0; } 100% { background-position: -60% 0; } }
+
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .logo { font-size: 18px; font-weight: 600; letter-spacing: 2px; }
+  .logo em { font-style: normal; color: var(--accent); }
+  .members { display: flex; align-items: center; }
+  .avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 600; color: #fff;
+    border: 2px solid rgba(255,255,255,0.6); margin-left: -8px;
+  }
+  .pill {
+    padding: 8px 16px; border-radius: 999px; font-size: 13px; cursor: pointer;
+    background: var(--glass-bg); border: 1px solid var(--glass-border);
+    color: var(--text-hi); backdrop-filter: blur(10px); transition: 0.2s;
+  }
+  .pill:hover { filter: brightness(1.25); }
+  .share-btn { margin-left: 14px; }
+
+  .themes { display: flex; gap: 8px; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
+  .themes .hint { font-size: 12px; color: var(--text-lo); margin-right: 2px; }
+  .swatch {
+    width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+    border: 2px solid rgba(255,255,255,0.45); transition: transform 0.15s;
+  }
+  .swatch:hover { transform: scale(1.15); }
+  .swatch.active { border-color: var(--text-hi); box-shadow: 0 0 0 2px var(--accent); }
+  .sw-midnight { background: linear-gradient(135deg, #4338ca, #db2777, #0891b2); }
+  .sw-sunset { background: linear-gradient(135deg, #ea580c, #e11d48, #f59e0b); }
+  .sw-forest { background: linear-gradient(135deg, #059669, #365314, #155e75); }
+  .sw-cream { background: linear-gradient(135deg, #fcd34d, #f9a8d4, #c7d2fe); }
+  .sw-sakura { background: linear-gradient(135deg, #f9a8d4, #fda4af, #e9d5ff); }
+
+  .hero { padding: 30px 28px 32px; text-align: center; margin-bottom: 20px; }
+  .photo-wrap { margin: 0 auto 20px; display: none; }
+  body.show-photo .photo-wrap { display: block; }
+  .photo {
+    width: 112px; height: 112px; margin: 0 auto; border-radius: 50%;
+    border: 3px solid var(--glass-highlight);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3), 0 0 0 6px var(--glass-bg);
+    background: linear-gradient(135deg, var(--b2), var(--b4));
+    display: flex; align-items: center; justify-content: center; font-size: 44px;
+    object-fit: cover;
+  }
+  .hero .label { font-size: 13px; color: var(--text-mid); letter-spacing: 4px; margin-bottom: 6px; }
+  .hero .title { font-size: 22px; font-weight: 600; margin-bottom: 22px; }
+  .count { display: flex; justify-content: center; gap: 12px; }
+  .unit { min-width: 86px; padding: 16px 8px 12px; border-radius: 18px;
+    background: var(--glass-bg); border: 1px solid var(--glass-border); }
+  .unit b {
+    display: block; font-size: 44px; font-weight: 700; line-height: 1;
+    font-variant-numeric: tabular-nums; color: var(--text-hi);
+  }
+  .unit span { font-size: 12px; color: var(--text-lo); letter-spacing: 2px; }
+  .hero .date { margin-top: 20px; font-size: 13px; color: var(--text-mid); }
+  .photo-toggle { margin-top: 16px; font-size: 12px; }
+
+  .section-title { display: flex; align-items: center; justify-content: space-between; margin: 26px 4px 12px; }
+  .section-title h2 { font-size: 15px; font-weight: 600; color: var(--text-mid); letter-spacing: 1px; }
+
+  .timeline { padding: 22px 20px; }
+  .day { font-size: 13px; color: var(--text-lo); letter-spacing: 1px; margin: 4px 0 10px; }
+  .slot { display: grid; grid-template-columns: 76px 1fr; gap: 12px; margin-bottom: 10px; }
+  .slot time { font-size: 12px; color: var(--text-mid); padding-top: 10px; font-variant-numeric: tabular-nums; }
+  .event {
+    border-radius: 14px; padding: 10px 14px;
+    background: var(--glass-bg); border: 1px solid var(--glass-border);
+    border-left: 3px solid var(--c); border-top-left-radius: 0; border-bottom-left-radius: 0;
+  }
+  .event .name { font-size: 14px; font-weight: 600; }
+  .event .who { font-size: 12px; color: var(--text-lo); margin-top: 2px; }
+  .event.live { box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 30%, transparent); }
+  .event.live .badge {
+    display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 30%, transparent);
+    color: var(--text-hi); margin-left: 8px; animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse { 50% { opacity: 0.5; } }
+  .nowline { display: grid; grid-template-columns: 76px 1fr; gap: 12px; align-items: center; margin: 6px 0; }
+  .nowline time { font-size: 12px; color: var(--accent); font-weight: 600; }
+  .nowline .bar { height: 2px; border-radius: 2px; position: relative;
+    background: linear-gradient(90deg, var(--accent), transparent); }
+  .nowline .bar::before { content: ""; position: absolute; left: -4px; top: -3px;
+    width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
+    box-shadow: 0 0 10px var(--accent); }
+
+  @media (max-width: 520px) {
+    .count { gap: 8px; } .unit { min-width: 0; flex: 1; } .unit b { font-size: 32px; }
+  }
+</style>
+</head>
+<body class="show-photo" data-theme="midnight">
+<div class="aurora"><span class="a1"></span><span class="a2"></span><span class="a3"></span><span class="a4"></span></div>
+
+<div class="wrap">
+  <header>
+    <div class="logo">Meet<em>Time</em></div>
+    <div class="members">
+      <div class="avatar" style="background:var(--c-me)">我</div>
+      <div class="avatar" style="background:var(--c-her)">安</div>
+      <div class="avatar" style="background:var(--c-p3)">哲</div>
+      <div class="avatar" style="background:var(--c-p4)">庭</div>
+      <button class="pill share-btn">＋ 邀請</button>
+    </div>
+  </header>
+
+  <div class="themes">
+    <span class="hint">主題</span>
+    <div class="swatch sw-midnight active" data-theme="midnight" title="深夜流光"></div>
+    <div class="swatch sw-sunset" data-theme="sunset" title="暖陽晚霞"></div>
+    <div class="swatch sw-forest" data-theme="forest" title="森林霧光"></div>
+    <div class="swatch sw-cream" data-theme="cream" title="奶油鬆弛"></div>
+    <div class="swatch sw-sakura" data-theme="sakura" title="櫻花粉嫩"></div>
+  </div>
+
+  <section class="glass hero">
+    <div class="photo-wrap"><div class="photo">✈️</div></div>
+    <div class="label">COUNTDOWN</div>
+    <div class="title">東京之旅出發倒數</div>
+    <div class="count">
+      <div class="unit"><b id="d">02</b><span>天</span></div>
+      <div class="unit"><b id="h">14</b><span>時</span></div>
+      <div class="unit"><b id="m">36</b><span>分</span></div>
+      <div class="unit"><b id="s">18</b><span>秒</span></div>
+    </div>
+    <div class="date">2026/08/04（二）06:30 桃園機場集合</div>
+    <button class="pill photo-toggle" onclick="document.body.classList.toggle('show-photo')">📷 顯示/隱藏照片</button>
+  </section>
+
+  <div class="section-title">
+    <h2>等待的行程</h2>
+    <button class="pill">＋ 新增行程</button>
+  </div>
+
+  <section class="glass timeline">
+    <div class="day">今天 8/1（六）</div>
+
+    <div class="slot">
+      <time>14:00–16:00</time>
+      <div class="event live" style="--c:var(--c-me)">
+        <div class="name">整理行李清單 <span class="badge">進行中</span></div>
+        <div class="who">我</div>
+      </div>
+    </div>
+
+    <div class="nowline"><time>15:42</time><div class="bar"></div></div>
+
+    <div class="slot">
+      <time>19:00–21:00</time>
+      <div class="event" style="--c:var(--c-her)">
+        <div class="name">查東京美食清單</div>
+        <div class="who">小安</div>
+      </div>
+    </div>
+
+    <div class="day" style="margin-top:18px">明天 8/2（日）</div>
+
+    <div class="slot">
+      <time>10:00–12:00</time>
+      <div class="event" style="--c:var(--c-p3)">
+        <div class="name">換日幣、買旅遊險</div>
+        <div class="who">阿哲</div>
+      </div>
+    </div>
+
+    <div class="slot">
+      <time>15:00–17:30</time>
+      <div class="event" style="--c:var(--c-p4)">
+        <div class="name">確認飯店＆迪士尼門票</div>
+        <div class="who">小庭</div>
+      </div>
+    </div>
+
+    <div class="slot">
+      <time>22:00–23:00</time>
+      <div class="event" style="--c:var(--c-me)">
+        <div class="name">視訊對行程 📞</div>
+        <div class="who">我 + 全員</div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  document.querySelectorAll(".swatch").forEach(sw => {
+    sw.addEventListener("click", () => {
+      document.body.dataset.theme = sw.dataset.theme;
+      document.querySelectorAll(".swatch").forEach(x => x.classList.remove("active"));
+      sw.classList.add("active");
+    });
+  });
+
+  const target = new Date(Date.now() + (2*24*3600 + 14*3600 + 36*60 + 18) * 1000);
+  const pad = n => String(n).padStart(2, "0");
+  setInterval(() => {
+    let t = Math.max(0, (target - Date.now()) / 1000 | 0);
+    document.getElementById("d").textContent = pad(t / 86400 | 0);
+    document.getElementById("h").textContent = pad(t / 3600 % 24 | 0);
+    document.getElementById("m").textContent = pad(t / 60 % 60 | 0);
+    document.getElementById("s").textContent = pad(t % 60);
+  }, 1000);
+</script>
+</body>
+</html>
