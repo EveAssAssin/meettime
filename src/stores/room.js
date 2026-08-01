@@ -69,17 +69,49 @@ export const useRoomStore = defineStore('room', {
         .from('rooms').select().eq('code', code.toUpperCase()).single()
       if (error || !room) throw new Error('找不到這個房間，請確認房間碼')
 
-      const { count } = await supabase
-        .from('members').select('*', { count: 'exact', head: true }).eq('room_id', room.id)
+      const { data: existing } = await supabase
+        .from('members').select().eq('room_id', room.id).order('created_at')
+
+      // 同暱稱視為同一人，直接認領，不再新建
+      const dup = (existing || []).find(
+        (m) => m.nickname.trim().toLowerCase() === nickname.trim().toLowerCase(),
+      )
+      if (dup) {
+        localStorage.setItem(identityKey(room.code), JSON.stringify({ memberId: dup.id, nickname: dup.nickname }))
+        return room.code
+      }
 
       const { data: member, error: e2 } = await supabase
         .from('members')
-        .insert({ room_id: room.id, nickname, color: MEMBER_COLORS[(count || 0) % MEMBER_COLORS.length] })
+        .insert({ room_id: room.id, nickname, color: MEMBER_COLORS[(existing?.length || 0) % MEMBER_COLORS.length] })
         .select().single()
       if (e2) throw e2
 
       localStorage.setItem(identityKey(room.code), JSON.stringify({ memberId: member.id, nickname }))
       return room.code
+    },
+
+    claimMember(member) {
+      localStorage.setItem(
+        identityKey(this.room.code),
+        JSON.stringify({ memberId: member.id, nickname: member.nickname }),
+      )
+      this.me = member
+    },
+
+    scheduleCountOf(memberId) {
+      return this.schedules.filter((s) => s.member_id === memberId).length
+    },
+
+    async removeMember(id) {
+      if (!this.me || this.room.owner_member_id !== this.me.id) {
+        throw new Error('只有房間建立者可以管理成員')
+      }
+      if (id === this.room.owner_member_id) throw new Error('不能刪除房間建立者')
+      if (this.scheduleCountOf(id) > 0) throw new Error('該成員已有行程，不能刪除')
+      await supabase.from('members').delete().eq('id', id)
+      const { data } = await supabase.from('members').select().eq('room_id', this.room.id).order('created_at')
+      this.members = data || []
     },
 
     getIdentity(code) {

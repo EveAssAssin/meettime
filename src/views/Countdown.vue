@@ -9,6 +9,10 @@
             v-for="m in store.members" :key="m.id"
             class="avatar" :style="{ background: m.color }" :title="m.nickname"
           >{{ m.nickname.slice(0, 1) }}</div>
+          <button
+            v-if="isOwner" class="pill member-btn" title="成員管理"
+            @click="showMembers = !showMembers"
+          >⚙</button>
           <button class="pill share-btn" @click="share">＋ 邀請</button>
         </div>
       </header>
@@ -26,11 +30,35 @@
       </div>
 
       <div v-if="!store.me" class="glass join-bar">
-        <span>你還沒加入這個房間</span>
+        <div v-if="store.members.length" class="claim-row">
+          <span>你是哪一位？點名字直接進入：</span>
+          <div class="claim-chips">
+            <button
+              v-for="m in store.members" :key="m.id"
+              class="pill claim-chip" :style="{ borderColor: m.color }"
+              @click="store.claimMember(m)"
+            >{{ m.nickname }}</button>
+          </div>
+        </div>
         <form class="join-form" @submit.prevent="join">
+          <span class="join-hint">{{ store.members.length ? '都不是？' : '' }}輸入新暱稱加入：</span>
           <input v-model="nickname" class="field" placeholder="你的暱稱" required maxlength="12" />
           <button class="pill primary" :disabled="joining">加入</button>
         </form>
+      </div>
+
+      <div v-if="isOwner && showMembers" class="glass member-manage">
+        <div class="mm-head">成員管理 <span class="mm-hint">（沒有行程的重複成員可刪除）</span></div>
+        <div v-for="m in store.members" :key="m.id" class="mm-row">
+          <span class="avatar" :style="{ background: m.color }">{{ m.nickname.slice(0, 1) }}</span>
+          <span class="mm-name">{{ m.nickname }}</span>
+          <span class="mm-count">{{ store.scheduleCountOf(m.id) }} 個行程</span>
+          <button
+            v-if="m.id !== store.room.owner_member_id && store.scheduleCountOf(m.id) === 0"
+            class="pill mm-del" @click="onRemoveMember(m.id)"
+          >刪除</button>
+          <span v-else class="mm-lock">{{ m.id === store.room.owner_member_id ? '房主' : '' }}</span>
+        </div>
       </div>
 
       <section v-if="store.meeting" class="glass hero">
@@ -198,8 +226,17 @@ const notifState = ref(typeof Notification !== 'undefined' ? Notification.permis
 const lightbox = ref(null)
 const shareTarget = ref(null)
 const showMilestones = ref(false)
+const showMembers = ref(false)
 const now = ref(new Date())
 let nowTimer
+
+async function onRemoveMember(id) {
+  try {
+    await store.removeMember(id)
+  } catch (e) {
+    uploadError.value = e.message
+  }
+}
 
 const isImage = (t) => t && t.startsWith('image/')
 const isOwner = computed(() => store.me && store.room?.owner_member_id === store.me.id)
@@ -380,11 +417,25 @@ header { display: flex; align-items: center; justify-content: space-between; mar
 }
 .edit-meeting:hover { color: var(--accent); }
 .join-bar {
-  padding: 14px 18px; margin-bottom: 18px; font-size: 14px;
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 16px 18px; margin-bottom: 18px; font-size: 14px;
+  display: flex; flex-direction: column; gap: 12px;
 }
-.join-form { display: flex; gap: 10px; }
+.claim-row { display: flex; flex-direction: column; gap: 8px; }
+.claim-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.claim-chip { border-width: 2px; font-weight: 600; }
+.join-form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.join-hint { font-size: 13px; color: var(--text-mid); }
 .join-form .field { width: 150px; padding: 8px 12px; }
+.member-btn { margin-left: 14px; }
+.share-btn { margin-left: 8px; }
+.member-manage { padding: 14px 18px; margin-bottom: 18px; }
+.mm-head { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+.mm-hint { font-size: 12px; color: var(--text-lo); font-weight: 400; }
+.mm-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+.mm-name { font-size: 14px; font-weight: 600; }
+.mm-count { font-size: 12px; color: var(--text-lo); }
+.mm-del { font-size: 12px; padding: 4px 12px; margin-left: auto; color: #fca5a5; }
+.mm-lock { font-size: 12px; color: var(--text-lo); margin-left: auto; }
 .hero { padding: 30px 28px 32px; text-align: center; margin-bottom: 20px; }
 .photo-wrap { margin-bottom: 20px; position: relative; display: inline-block; }
 .photo-x {
