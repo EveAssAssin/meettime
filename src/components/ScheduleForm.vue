@@ -114,7 +114,12 @@ async function submit() {
 .modal { width: 100%; max-width: 440px; padding: 24px; max-height: 90vh; overflow-y: auto; }
 h3 { font-size: 17px; margin-bottom: 6px; }
 label { display: block; font-size: 13px; color: var(--text-mid); margin: 14px 0 6px; }
-.row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.row .field {
+  min-width: 0; width: 100%;
+  padding: 12px 8px; font-size: 13px;
+}
+.row .field::-webkit-calendar-picker-indicator { margin: 0; }
 .att-list { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .att-chip {
   display: flex; align-items: center; gap: 6px; max-width: 100%;
