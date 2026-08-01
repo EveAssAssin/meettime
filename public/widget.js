@@ -5,17 +5,39 @@ async function makeWidget(roomCode) {
   const headers = { apikey: ANON_KEY, Authorization: "Bearer " + ANON_KEY }
 
   let meeting = null
+  let currentSched = null
+  let nextSched = null
   if (roomCode) {
     let req = new Request(SUPABASE_URL + "/rest/v1/rooms?code=eq." + roomCode.toUpperCase() + "&select=id")
     req.headers = headers
     const rooms = await req.loadJSON()
     if (rooms.length) {
       req = new Request(SUPABASE_URL + "/rest/v1/meetings?room_id=eq." + rooms[0].id +
-        "&status=eq.active&select=title,meet_at&order=created_at.desc&limit=1")
+        "&status=eq.active&select=id,title,meet_at&order=created_at.desc&limit=1")
       req.headers = headers
       const meetings = await req.loadJSON()
       meeting = meetings[0] || null
+      if (meeting) {
+        const nowIso = new Date().toISOString()
+        req = new Request(SUPABASE_URL + "/rest/v1/schedules?meeting_id=eq." + meeting.id +
+          "&start_at=lte." + nowIso + "&end_at=gt." + nowIso +
+          "&select=title,start_at,end_at,completed_at&order=start_at.desc&limit=1")
+        req.headers = headers
+        currentSched = (await req.loadJSON())[0] || null
+        if (!currentSched) {
+          req = new Request(SUPABASE_URL + "/rest/v1/schedules?meeting_id=eq." + meeting.id +
+            "&start_at=gt." + nowIso +
+            "&select=title,start_at,end_at&order=start_at.asc&limit=1")
+          req.headers = headers
+          nextSched = (await req.loadJSON())[0] || null
+        }
+      }
     }
+  }
+
+  function hm(d) {
+    const x = new Date(d)
+    return String(x.getHours()).padStart(2, "0") + ":" + String(x.getMinutes()).padStart(2, "0")
   }
 
   function remainText(meetAt) {
@@ -49,10 +71,24 @@ async function makeWidget(roomCode) {
     r.minimumScaleFactor = 0.5
     w.addSpacer(6)
     const dt = new Date(meeting.meet_at)
-    const dText = w.addText((dt.getMonth() + 1) + "/" + dt.getDate() + " " +
-      String(dt.getHours()).padStart(2, "0") + ":" + String(dt.getMinutes()).padStart(2, "0"))
+    const dText = w.addText((dt.getMonth() + 1) + "/" + dt.getDate() + " " + hm(dt))
     dText.font = Font.systemFont(11)
     dText.textColor = new Color("#ffffff", 0.5)
+
+    if (currentSched) {
+      w.addSpacer(5)
+      const c = w.addText("▶ " + (currentSched.completed_at ? "✓ " : "") + currentSched.title +
+        " " + hm(currentSched.start_at) + "–" + hm(currentSched.end_at))
+      c.font = Font.mediumSystemFont(11)
+      c.textColor = new Color("#7dd3fc", 0.95)
+      c.lineLimit = 1
+    } else if (nextSched) {
+      w.addSpacer(5)
+      const c = w.addText("接下來 " + hm(nextSched.start_at) + " " + nextSched.title)
+      c.font = Font.systemFont(11)
+      c.textColor = new Color("#ffffff", 0.6)
+      c.lineLimit = 1
+    }
     w.url = "https://meettime.onrender.com/r/" + roomCode.toUpperCase()
   } else {
     const t = w.addText("找不到倒數，確認房間碼")

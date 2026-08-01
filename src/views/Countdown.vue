@@ -131,6 +131,27 @@
         <p v-if="uploadError" class="upload-error">{{ uploadError }}</p>
       </section>
 
+      <section v-if="quickSchedule && store.me" class="glass live-card">
+        <div class="live-info">
+          <span class="live-tag" :class="{ upcoming: !quickSchedule.live }">
+            {{ quickSchedule.live ? '● 進行中' : '接下來' }}
+          </span>
+          <b class="live-title" :class="{ done: quickSchedule.s.completed_at }">{{ quickSchedule.s.title }}</b>
+          <span class="live-time">
+            {{ dayjs(quickSchedule.s.start_at).format('HH:mm') }}–{{ dayjs(quickSchedule.s.end_at).format('HH:mm') }}
+          </span>
+        </div>
+        <div class="live-actions">
+          <button
+            class="live-btn check-btn" :class="{ checked: quickSchedule.s.completed_at }"
+            @click="store.toggleComplete(quickSchedule.s)"
+          >{{ quickSchedule.s.completed_at ? '✓ 已達成' : '✓ 達成' }}</button>
+          <button class="live-btn" :disabled="uploading" @click="openScheduleAttach(quickSchedule.s)">
+            {{ uploading ? '…' : '📷 傳照片' }}
+          </button>
+        </div>
+      </section>
+
       <div class="section-title">
         <h2>{{ store.journeyDone ? '旅程紀錄' : '等待的行程' }}</h2>
         <div class="section-actions">
@@ -260,6 +281,16 @@ function doneName(schedule) {
   if (!schedule.completed_at) return ''
   return store.members.find((m) => m.id === schedule.completed_by)?.nickname || ''
 }
+
+const quickSchedule = computed(() => {
+  const t = now.value.getTime()
+  const live = store.schedules.find(
+    (s) => t >= +new Date(s.start_at) && t < +new Date(s.end_at),
+  )
+  if (live) return { s: live, live: true }
+  const next = store.schedules.find((s) => +new Date(s.start_at) > t)
+  return next ? { s: next, live: false } : null
+})
 
 const meetAtText = computed(() =>
   store.countdownTarget ? dayjs(store.countdownTarget).format('YYYY/M/D（dd）HH:mm') : '')
@@ -498,6 +529,35 @@ header { display: flex; align-items: center; justify-content: space-between; mar
 .label { font-size: 13px; color: var(--text-mid); letter-spacing: 4px; margin-bottom: 6px; }
 .title { font-size: 22px; font-weight: 600; margin-bottom: 22px; }
 .date { margin-top: 20px; font-size: 13px; color: var(--text-mid); }
+.live-card {
+  padding: 16px 18px; margin: 20px 0 4px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap;
+}
+.live-info { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.live-tag {
+  font-size: 12px; font-weight: 700; color: var(--accent);
+  padding: 3px 10px; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  animation: pulse 1.8s ease-in-out infinite; white-space: nowrap;
+}
+.live-tag.upcoming { animation: none; color: var(--text-mid); background: var(--glass-bg); }
+@keyframes pulse { 50% { opacity: 0.55; } }
+.live-title { font-size: 16px; }
+.live-title.done { text-decoration: line-through; opacity: 0.7; }
+.live-time { font-size: 12px; color: var(--text-mid); font-variant-numeric: tabular-nums; }
+.live-actions { display: flex; gap: 10px; flex: 1; justify-content: flex-end; min-width: 200px; }
+.live-btn {
+  padding: 12px 18px; border-radius: 14px; font-size: 15px; font-weight: 600;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  color: var(--text-hi); cursor: pointer; font-family: inherit; transition: 0.15s;
+}
+.live-btn:active { transform: scale(0.96); }
+.check-btn.checked { background: rgba(34,197,94,0.3); border-color: rgba(34,197,94,0.6); }
+@media (max-width: 520px) {
+  .live-actions { min-width: 0; width: 100%; }
+  .live-btn { flex: 1; padding: 14px 10px; }
+}
 .section-title { display: flex; align-items: center; justify-content: space-between; margin: 26px 4px 12px; flex-wrap: wrap; gap: 8px; }
 .section-title h2 { font-size: 15px; font-weight: 600; color: var(--text-mid); letter-spacing: 1px; }
 .section-actions { display: flex; gap: 8px; }
