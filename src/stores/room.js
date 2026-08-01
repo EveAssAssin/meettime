@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { supabase } from '../lib/supabase'
+import { useAuthStore } from './auth'
 
 const MEMBER_COLORS = ['#7dd3fc', '#f9a8d4', '#c4b5fd', '#86efac', '#fdba74', '#fca5a5', '#67e8f9', '#d9f99d']
 const MAX_FILE_MB = 10
@@ -47,9 +48,10 @@ export const useRoomStore = defineStore('room', {
         .from('rooms').insert({ code }).select().single()
       if (e1) throw e1
 
+      const auth = useAuthStore()
       const { data: member, error: e2 } = await supabase
         .from('members')
-        .insert({ room_id: room.id, nickname, color: MEMBER_COLORS[0] })
+        .insert({ room_id: room.id, nickname, color: MEMBER_COLORS[0], user_id: auth.user?.id || null })
         .select().single()
       if (e2) throw e2
 
@@ -72,18 +74,36 @@ export const useRoomStore = defineStore('room', {
       const { data: existing } = await supabase
         .from('members').select().eq('room_id', room.id).order('created_at')
 
+      const auth = useAuthStore()
+
+      // 已登入且此房間已有綁定此帳號的成員 → 直接認領
+      if (auth.user) {
+        const mine = (existing || []).find((m) => m.user_id === auth.user.id)
+        if (mine) {
+          localStorage.setItem(identityKey(room.code), JSON.stringify({ memberId: mine.id, nickname: mine.nickname }))
+          return room.code
+        }
+      }
+
       // 同暱稱視為同一人，直接認領，不再新建
       const dup = (existing || []).find(
         (m) => m.nickname.trim().toLowerCase() === nickname.trim().toLowerCase(),
       )
       if (dup) {
+        if (auth.user && !dup.user_id) {
+          await supabase.from('members').update({ user_id: auth.user.id }).eq('id', dup.id)
+        }
         localStorage.setItem(identityKey(room.code), JSON.stringify({ memberId: dup.id, nickname: dup.nickname }))
         return room.code
       }
 
       const { data: member, error: e2 } = await supabase
         .from('members')
-        .insert({ room_id: room.id, nickname, color: MEMBER_COLORS[(existing?.length || 0) % MEMBER_COLORS.length] })
+        .insert({
+          room_id: room.id, nickname,
+          color: MEMBER_COLORS[(existing?.length || 0) % MEMBER_COLORS.length],
+          user_id: auth.user?.id || null,
+        })
         .select().single()
       if (e2) throw e2
 
@@ -97,6 +117,28 @@ export const useRoomStore = defineStore('room', {
         JSON.stringify({ memberId: member.id, nickname: member.nickname }),
       )
       this.me = member
+      const auth = useAuthStore()
+      if (auth.user && !member.user_id) {
+        supabase.from('members').update({ user_id: auth.user.id }).eq('id', member.id)
+          .then(() => { member.user_id = auth.user.id })
+      }
+    },
+
+    async myRooms() {
+      const auth = useAuthStore()
+      if (!auth.user) return []
+      const { data } = await supabase
+        .from('members')
+        .select('nickname, rooms(code, created_at, meetings(title, status))')
+        .eq('user_id', auth.user.id)
+      return (data || [])
+        .filter((m) => m.rooms)
+        .map((m) => ({
+          code: m.rooms.code,
+          nickname: m.nickname,
+          title: m.rooms.meetings?.find((x) => x.status === 'active')?.title
+            || m.rooms.meetings?.[0]?.title || '',
+        }))
     },
 
     scheduleCountOf(memberId) {
@@ -134,7 +176,23 @@ export const useRoomStore = defineStore('room', {
         this.loadMeeting(room.id),
       ])
       this.members = members || []
-      this.me = identity ? (members || []).find((m) => m.id === identity.memberId) || null : null
+
+      // 身分優先序：帳號綁定 > 本機記錄（並順手把本機身分綁上帳號）
+      const auth = useAuthStore()
+      this.me = null
+      if (auth.user) {
+        this.me = (members || []).find((m) => m.user_id === auth.user.id) || null
+      }
+      if (!this.me && identity) {
+        const m = (members || []).find((x) => x.id === identity.memberId) || null
+        if (m) {
+          this.me = m
+          if (auth.user && !m.user_id) {
+            supabase.from('members').update({ user_id: auth.user.id }).eq('id', m.id)
+              .then(() => { m.user_id = auth.user.id })
+          }
+        }
+      }
 
       if (this.meeting) await this.loadSchedules()
       this.subscribe()

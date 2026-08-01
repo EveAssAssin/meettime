@@ -29,7 +29,12 @@
         <span v-if="copied" class="copied">{{ copiedText }}</span>
       </div>
 
-      <div v-if="!store.me" class="glass join-bar">
+      <div v-if="!store.me && !auth.user" class="glass join-bar">
+        <span>請先登入或建立帳號，才能加入這個倒數</span>
+        <router-link class="pill primary" :to="`/?redirect=/r/${store.room.code}`">前往登入 →</router-link>
+      </div>
+
+      <div v-else-if="!store.me" class="glass join-bar">
         <div v-if="store.members.length" class="claim-row">
           <span>你是哪一位？點名字直接進入：</span>
           <div class="claim-chips">
@@ -42,7 +47,7 @@
         </div>
         <form class="join-form" @submit.prevent="join">
           <span class="join-hint">{{ store.members.length ? '都不是？' : '' }}輸入新暱稱加入：</span>
-          <input v-model="nickname" class="field" placeholder="你的暱稱" required maxlength="12" />
+          <input v-model="nickname" class="field" :placeholder="auth.user?.username || '你的暱稱'" required maxlength="12" />
           <button class="pill primary" :disabled="joining">加入</button>
         </form>
       </div>
@@ -194,6 +199,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useRoomStore } from '../stores/room'
+import { useAuthStore } from '../stores/auth'
 import { dayjs } from '../lib/time'
 import BigTimer from '../components/BigTimer.vue'
 import ThemePicker from '../components/ThemePicker.vue'
@@ -206,6 +212,7 @@ import MilestoneForm from '../components/MilestoneForm.vue'
 
 const route = useRoute()
 const store = useRoomStore()
+const auth = useAuthStore()
 
 const pageError = ref('')
 const showForm = ref(false)
@@ -273,6 +280,7 @@ watch(() => store.room?.theme, (t) => {
 
 onMounted(async () => {
   nowTimer = setInterval(() => { now.value = new Date() }, 30000)
+  if (auth.user) nickname.value = auth.user.username
   try {
     await store.loadRoom(route.params.code)
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
