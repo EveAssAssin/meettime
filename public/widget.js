@@ -65,10 +65,21 @@ async function makeWidget(roomCode) {
     t.textColor = new Color("#ffffff", 0.75)
     t.lineLimit = 1
     w.addSpacer(6)
-    const r = w.addText(remainText(meeting.meet_at))
-    r.font = Font.boldSystemFont(22)
-    r.textColor = Color.white()
-    r.minimumScaleFactor = 0.5
+    const remainMs = new Date(meeting.meet_at) - new Date()
+    if (remainMs > 0 && remainMs < 86400000) {
+      // 24 小時內：系統動態倒數，秒級即時跳動、免刷新
+      const r = w.addDate(new Date(meeting.meet_at))
+      r.applyTimerStyle()
+      r.font = Font.boldSystemFont(26)
+      r.textColor = Color.white()
+      r.minimumScaleFactor = 0.5
+      r.lineLimit = 1
+    } else {
+      const r = w.addText(remainText(meeting.meet_at))
+      r.font = Font.boldSystemFont(22)
+      r.textColor = Color.white()
+      r.minimumScaleFactor = 0.5
+    }
     w.addSpacer(6)
     const dt = new Date(meeting.meet_at)
     const dText = w.addText((dt.getMonth() + 1) + "/" + dt.getDate() + " " + hm(dt))
@@ -77,16 +88,21 @@ async function makeWidget(roomCode) {
 
     if (currentSched) {
       w.addSpacer(5)
-      const remainMin = Math.max(0, Math.round((new Date(currentSched.end_at) - new Date()) / 60000))
       const c = w.addText("▶ " + (currentSched.completed_at ? "✓ " : "") + currentSched.title)
       c.font = Font.semiboldSystemFont(15)
       c.textColor = new Color("#7dd3fc", 0.98)
       c.lineLimit = 1
       c.minimumScaleFactor = 0.7
-      const c2 = w.addText(hm(currentSched.start_at) + "–" + hm(currentSched.end_at) + "・剩 " + remainMin + " 分")
+      const row = w.addStack()
+      row.centerAlignContent()
+      const c2 = row.addText(hm(currentSched.start_at) + "–" + hm(currentSched.end_at) + "・剩 ")
       c2.font = Font.mediumSystemFont(12)
       c2.textColor = new Color("#7dd3fc", 0.7)
-      c2.lineLimit = 1
+      const c3 = row.addDate(new Date(currentSched.end_at))
+      c3.applyTimerStyle()
+      c3.font = Font.semiboldSystemFont(12)
+      c3.textColor = new Color("#7dd3fc", 0.9)
+      c3.lineLimit = 1
     } else if (nextSched) {
       w.addSpacer(5)
       const c = w.addText("接下來 " + nextSched.title)
@@ -105,6 +121,6 @@ async function makeWidget(roomCode) {
     t.textColor = Color.white()
   }
 
-  w.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000)
+  w.refreshAfterDate = new Date(Date.now() + 5 * 60 * 1000)
   return w
 }
