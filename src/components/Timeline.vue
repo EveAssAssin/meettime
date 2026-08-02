@@ -57,6 +57,11 @@
               {{ memberName(item.member_id) }}
               <button v-if="meId" class="del" @click="$emit('attach', item)">📷 傳照片</button>
               <button v-if="meId" class="del" @click="$emit('alarm', item)">⏰ 鬧鐘</button>
+              <button
+                v-if="meId" class="del timer-toggle" :class="{ on: item.show_timer }"
+                :title="item.show_timer ? '小組件倒數：開' : '小組件倒數：關'"
+                @click="$emit('toggle-timer', item)"
+              >⏱ {{ item.show_timer ? '倒數開' : '倒數關' }}</button>
               <button v-if="hasImages(item)" class="del" @click="$emit('share', item)">✨ 美照</button>
               <template v-if="item.member_id === meId">
                 <button class="del" @click="$emit('edit', item)">編輯</button>
@@ -87,7 +92,7 @@ const props = defineProps({
   members: { type: Array, default: () => [] },
   meId: String,
 })
-defineEmits(['remove', 'edit', 'toggle-complete', 'attach', 'react', 'preview', 'share', 'quick-add', 'alarm'])
+defineEmits(['remove', 'edit', 'toggle-complete', 'attach', 'react', 'preview', 'share', 'quick-add', 'alarm', 'toggle-timer'])
 
 const EMOJIS = ['❤️', '👍', '😂', '🎉', '😭']
 const isImage = (t) => t && t.startsWith('image/')
@@ -229,6 +234,8 @@ const groups = computed(() => {
   cursor: pointer; text-decoration: underline; padding: 0; font-family: inherit;
 }
 .del:hover { color: #fca5a5; }
+.timer-toggle.on { color: var(--accent); font-weight: 600; }
+.timer-toggle.on:hover { color: var(--accent); }
 .gap-row { display: grid; grid-template-columns: 86px 1fr; gap: 12px; margin: 2px 0 10px; }
 .gap-btn {
   border: 1px dashed var(--glass-border); background: none; border-radius: 10px;

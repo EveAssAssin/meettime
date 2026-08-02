@@ -194,6 +194,7 @@
         @share="shareTarget = $event"
         @quick-add="onQuickAdd"
         @alarm="onScheduleAlarm"
+        @toggle-timer="store.toggleTimer"
       />
       <input ref="schedAttInput" type="file" accept="image/*,*/*" multiple hidden @change="onSchedAttPick" />
 

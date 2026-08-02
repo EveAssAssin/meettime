@@ -204,6 +204,13 @@ export const useRoomStore = defineStore('room', {
         .eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle()
       if (data?.milestones) {
         data.milestones.sort((a, b) => new Date(a.target_at) - new Date(b.target_at))
+        // 讓 meet_at 永遠跟著下一個未到目標（小組件依賴此欄位）
+        const next = data.milestones.find((m) => new Date(m.target_at) > new Date())
+        const target = next?.target_at || data.milestones.at(-1)?.target_at
+        if (target && target !== data.meet_at) {
+          data.meet_at = target
+          supabase.from('meetings').update({ meet_at: target }).eq('id', data.id).then(() => {})
+        }
       }
       this.meeting = data
     },
@@ -392,6 +399,13 @@ export const useRoomStore = defineStore('room', {
           file_url: url, file_name: file.name, file_type: file.type,
         })
       }
+      await this.loadSchedules()
+    },
+
+    async toggleTimer(schedule) {
+      if (!this.me) return
+      await supabase.from('schedules')
+        .update({ show_timer: !schedule.show_timer }).eq('id', schedule.id)
       await this.loadSchedules()
     },
 
