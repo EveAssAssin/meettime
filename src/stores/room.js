@@ -270,7 +270,26 @@ export const useRoomStore = defineStore('room', {
       return data.publicUrl
     },
 
-    async saveSchedule({ id, title, startAt, endAt, note, newFiles = [], removeAttachmentIds = [] }) {
+    async autoTrimNeighbors(scheduleId, startAt, endAt) {
+      const s0 = new Date(startAt)
+      const s1 = new Date(endAt)
+      for (const o of this.schedules) {
+        if (o.id === scheduleId) continue
+        const os = new Date(o.start_at)
+        const oe = new Date(o.end_at)
+        if (oe <= s0 || os >= s1) continue
+        if (os < s0) {
+          // 前行程尾巴被蓋到 → 提早結束
+          await supabase.from('schedules').update({ end_at: startAt }).eq('id', o.id)
+        } else if (oe > s1) {
+          // 後行程開頭被蓋到 → 延後開始
+          await supabase.from('schedules').update({ start_at: endAt }).eq('id', o.id)
+        }
+        // 完全被覆蓋的行程不動（避免變成無效時間），由使用者自行處理
+      }
+    },
+
+    async saveSchedule({ id, title, startAt, endAt, note, newFiles = [], removeAttachmentIds = [], autoTrim = false }) {
       if (!this.me) throw new Error('請先加入房間')
       let scheduleId = id
       if (id) {
@@ -298,6 +317,7 @@ export const useRoomStore = defineStore('room', {
       if (removeAttachmentIds.length) {
         await supabase.from('attachments').delete().in('id', removeAttachmentIds)
       }
+      if (autoTrim) await this.autoTrimNeighbors(scheduleId, startAt, endAt)
       await this.loadSchedules()
     },
 

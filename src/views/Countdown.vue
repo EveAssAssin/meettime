@@ -140,6 +140,7 @@
           <span class="live-time">
             {{ dayjs(quickSchedule.s.start_at).format('HH:mm') }}–{{ dayjs(quickSchedule.s.end_at).format('HH:mm') }}
           </span>
+          <span class="live-remain">{{ quickRemainText }}</span>
         </div>
         <div class="live-actions">
           <button
@@ -292,6 +293,25 @@ const quickSchedule = computed(() => {
   return next ? { s: next, live: false } : null
 })
 
+function fmtDur(ms) {
+  const t = Math.max(0, Math.floor(ms / 1000))
+  const h = Math.floor(t / 3600)
+  const m = Math.floor((t / 60) % 60)
+  const s = t % 60
+  if (h > 0) return `${h} 時 ${m} 分`
+  if (m > 0) return `${m} 分 ${String(s).padStart(2, '0')} 秒`
+  return `${s} 秒`
+}
+
+const quickRemainText = computed(() => {
+  if (!quickSchedule.value) return ''
+  const q = quickSchedule.value
+  const t = now.value.getTime()
+  return q.live
+    ? `⏳ 剩 ${fmtDur(+new Date(q.s.end_at) - t)}`
+    : `${fmtDur(+new Date(q.s.start_at) - t)}後開始`
+})
+
 const meetAtText = computed(() =>
   store.countdownTarget ? dayjs(store.countdownTarget).format('YYYY/M/D（dd）HH:mm') : '')
 
@@ -318,7 +338,7 @@ watch(() => store.room?.theme, (t) => {
 }, { immediate: true })
 
 onMounted(async () => {
-  nowTimer = setInterval(() => { now.value = new Date() }, 30000)
+  nowTimer = setInterval(() => { now.value = new Date() }, 1000)
   if (auth.user) nickname.value = auth.user.username
   try {
     await store.loadRoom(route.params.code)
@@ -546,6 +566,10 @@ header { display: flex; align-items: center; justify-content: space-between; mar
 .live-title { font-size: 16px; }
 .live-title.done { text-decoration: line-through; opacity: 0.7; }
 .live-time { font-size: 12px; color: var(--text-mid); font-variant-numeric: tabular-nums; }
+.live-remain {
+  font-size: 13px; font-weight: 700; color: var(--accent);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
 .live-actions { display: flex; gap: 10px; flex: 1; justify-content: flex-end; min-width: 200px; }
 .live-btn {
   padding: 12px 18px; border-radius: 14px; font-size: 15px; font-weight: 600;

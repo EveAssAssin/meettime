@@ -11,10 +11,11 @@
         <div v-else-if="item.gapAdd" class="gap-row">
           <span />
           <button
-            v-if="meId" class="gap-btn"
-            :title="`快速新增 ${fmt(item.startAt)}–${fmt(item.endAt)}`"
-            @click="$emit('quick-add', { startAt: item.startAt, endAt: item.endAt })"
-          >＋ {{ fmt(item.startAt) }}–{{ fmt(item.endAt) }} 插入行程</button>
+            v-if="meId" class="gap-btn" :class="{ squeeze: item.squeeze }"
+            @click="$emit('quick-add', { startAt: item.startAt, endAt: item.endAt, autoTrim: item.squeeze })"
+          >＋ {{ item.squeeze
+            ? `${fmt(item.startAt)} 插入行程（自動壓縮前後）`
+            : `${fmt(item.startAt)}–${fmt(item.endAt)} 插入行程` }}</button>
         </div>
         <div v-else class="slot">
           <time>{{ fmt(item.start_at) }}–{{ fmt(item.end_at) }}</time>
@@ -22,6 +23,7 @@
             class="event" :class="{ live: isLive(item), done: item.completed_at }"
             :style="{ '--c': memberColor(item.member_id) }"
           >
+            <div class="ev-main">
             <div class="name">
               <button
                 v-if="meId"
@@ -36,17 +38,11 @@
               </span>
               <span v-else-if="isLive(item)" class="badge">進行中</span>
             </div>
-            <div v-if="item.attachments?.length" class="atts">
-              <template v-for="(a, ai) in item.attachments" :key="a.id">
-                <img
-                  v-if="isImage(a.file_type)"
-                  :src="a.file_url" :alt="a.file_name" class="thumb"
-                  @click="$emit('preview', imageList(item), imageIndex(item, ai))"
-                />
-                <a v-else :href="a.file_url" target="_blank" rel="noopener" class="file-chip">
-                  📎 {{ a.file_name }}
-                </a>
-              </template>
+            <div v-if="fileList(item).length" class="atts">
+              <a
+                v-for="a in fileList(item)" :key="a.id"
+                :href="a.file_url" target="_blank" rel="noopener" class="file-chip"
+              >📎 {{ a.file_name }}</a>
             </div>
             <div class="reactions">
               <button
@@ -65,6 +61,14 @@
                 <button class="del" @click="$emit('edit', item)">編輯</button>
                 <button class="del" @click="$emit('remove', item.id)">刪除</button>
               </template>
+            </div>
+            </div>
+            <div
+              v-if="hasImages(item)" class="ev-photos"
+              @click="$emit('preview', imageList(item), 0)"
+            >
+              <img :src="imageList(item)[0].file_url" :alt="imageList(item)[0].file_name" />
+              <span v-if="imageList(item).length > 1" class="more">+{{ imageList(item).length - 1 }}</span>
             </div>
           </div>
         </div>
@@ -87,7 +91,7 @@ defineEmits(['remove', 'edit', 'toggle-complete', 'attach', 'react', 'preview', 
 const EMOJIS = ['❤️', '👍', '😂', '🎉', '😭']
 const isImage = (t) => t && t.startsWith('image/')
 const imageList = (item) => (item.attachments || []).filter((a) => isImage(a.file_type))
-const imageIndex = (item, ai) => imageList(item).findIndex((a) => a.id === item.attachments[ai].id)
+const fileList = (item) => (item.attachments || []).filter((a) => !isImage(a.file_type))
 const hasImages = (item) => imageList(item).length > 0
 const reactCount = (item, e) => (item.schedule_reactions || []).filter((r) => r.emoji === e).length
 const mineReacted = (item, e) =>
@@ -120,14 +124,16 @@ const groups = computed(() => {
     items.forEach((item, i) => {
       if (i > 0) {
         const prevEnd = items[i - 1].end_at
-        if (new Date(item.start_at) - new Date(prevEnd) >= 5 * 60 * 1000) {
-          out.push({
-            gapAdd: true,
-            id: `gap-${items[i - 1].id}`,
-            startAt: prevEnd,
-            endAt: item.start_at,
-          })
-        }
+        const gapMs = new Date(item.start_at) - new Date(prevEnd)
+        out.push({
+          gapAdd: true,
+          id: `gap-${items[i - 1].id}`,
+          startAt: prevEnd,
+          endAt: gapMs >= 5 * 60 * 1000
+            ? item.start_at
+            : new Date(+new Date(prevEnd) + 30 * 60 * 1000).toISOString(),
+          squeeze: gapMs < 5 * 60 * 1000,
+        })
       }
       if (key === todayKey && !inserted && +new Date(item.start_at) > now.value) {
         out.push({ nowline: true, id: 'nowline' })
@@ -152,6 +158,20 @@ const groups = computed(() => {
   border-radius: 14px; padding: 10px 14px;
   background: var(--glass-bg); border: 1px solid var(--glass-border);
   border-left: 3px solid var(--c); border-top-left-radius: 0; border-bottom-left-radius: 0;
+  display: flex; gap: 12px; align-items: flex-start;
+}
+.ev-main { flex: 1; min-width: 0; }
+.ev-photos {
+  position: relative; flex-shrink: 0; cursor: zoom-in; align-self: center;
+}
+.ev-photos img {
+  width: 74px; height: 74px; object-fit: cover; border-radius: 10px;
+  border: 1px solid var(--glass-border); display: block;
+}
+.ev-photos .more {
+  position: absolute; right: 4px; bottom: 4px;
+  font-size: 11px; font-weight: 700; color: #fff;
+  background: rgba(0,0,0,0.55); padding: 2px 7px; border-radius: 999px;
 }
 .event .name { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .check {

@@ -77,8 +77,9 @@ async function makeWidget(roomCode) {
 
     if (currentSched) {
       w.addSpacer(5)
+      const remainMin = Math.max(0, Math.round((new Date(currentSched.end_at) - new Date()) / 60000))
       const c = w.addText("▶ " + (currentSched.completed_at ? "✓ " : "") + currentSched.title +
-        " " + hm(currentSched.start_at) + "–" + hm(currentSched.end_at))
+        " " + hm(currentSched.start_at) + "–" + hm(currentSched.end_at) + "（剩 " + remainMin + " 分）")
       c.font = Font.mediumSystemFont(11)
       c.textColor = new Color("#7dd3fc", 0.95)
       c.lineLimit = 1

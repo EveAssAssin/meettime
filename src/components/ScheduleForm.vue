@@ -105,6 +105,7 @@ async function submit() {
     await new Promise((resolve, reject) => {
       emit('save', {
         id: props.schedule?.id,
+        autoTrim: !props.schedule && !!props.prefill?.autoTrim,
         title: title.value.trim(),
         startAt: new Date(startAt.value).toISOString(),
         endAt: new Date(endAt.value).toISOString(),
