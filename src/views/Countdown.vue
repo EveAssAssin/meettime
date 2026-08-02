@@ -159,9 +159,11 @@
           <h3>⏰ iPhone 鬧鐘設定（只需做一次）</h3>
           <ol>
             <li>打開「捷徑」App → 右上「＋」新增捷徑</li>
-            <li>捷徑名稱改為：<b>MeetTime鬧鐘</b></li>
-            <li>加入動作「<b>建立鬧鐘</b>」（時鐘）</li>
-            <li>點動作裡的「時間」→ 選變數「<b>捷徑輸入</b>」</li>
+            <li>捷徑名稱改為：<b>MeetTime鬧鐘</b><br>
+              <em>⚠️ 名稱要一模一樣，中間不能有空格</em></li>
+            <li>加入動作「<b>建立鬧鐘</b>」（時鐘類）</li>
+            <li>點動作裡的「時間」→ 選變數「<b>捷徑輸入</b>」<br>
+              <em>（標籤可自己填，例如 MeetTime）</em></li>
             <li>完成！以後點 ⏰ 就會自動設鬧鐘</li>
           </ol>
           <div class="actions">
@@ -335,7 +337,7 @@ function setAlarm(s, live) {
   } else if (p === 'ios') {
     pendingAlarm.value = { time, label }
     if (localStorage.getItem('meettime:ios-shortcut-ready')) {
-      location.href = iosShortcutUrl(time, label)
+      location.href = iosShortcutUrl(time)
     } else {
       showIosHelp.value = true
     }
@@ -353,7 +355,7 @@ function runIosShortcut() {
   localStorage.setItem('meettime:ios-shortcut-ready', '1')
   showIosHelp.value = false
   if (pendingAlarm.value) {
-    location.href = iosShortcutUrl(pendingAlarm.value.time, pendingAlarm.value.label)
+    location.href = iosShortcutUrl(pendingAlarm.value.time)
   }
 }
 
@@ -393,6 +395,7 @@ watch(() => store.room?.theme, (t) => {
 
 onMounted(async () => {
   nowTimer = setInterval(() => { now.value = new Date() }, 1000)
+  await auth.tryAutoLogin()
   if (auth.user) nickname.value = auth.user.username
   try {
     await store.loadRoom(route.params.code)

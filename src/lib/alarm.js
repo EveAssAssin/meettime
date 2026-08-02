@@ -18,11 +18,10 @@ export function androidAlarmUrl(date, label) {
     'B.android.intent.extra.alarm.SKIP_UI=false;end'
 }
 
-export function iosShortcutUrl(date, label) {
+export function iosShortcutUrl(date) {
   const time = dayjs(date).format('HH:mm')
-  const input = `${time}|${label}`
   return `shortcuts://run-shortcut?name=${encodeURIComponent(IOS_SHORTCUT_NAME)}` +
-    `&input=text&text=${encodeURIComponent(input)}`
+    `&input=text&text=${encodeURIComponent(time)}`
 }
 
 export function downloadIcs(date, endDate, label) {
