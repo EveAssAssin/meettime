@@ -2,7 +2,12 @@
   <div class="lb-overlay" @click.self="$emit('close')">
     <button class="lb-x" @click="$emit('close')">✕</button>
     <button v-if="images.length > 1" class="lb-nav prev" @click.stop="step(-1)">‹</button>
-    <img :src="images[idx]?.file_url" :alt="images[idx]?.file_name" class="lb-img" />
+    <img
+      :src="images[idx]?.file_url" :alt="images[idx]?.file_name" class="lb-img"
+      @click="images.length > 1 && step(1)"
+      @touchstart="onTouchStart"
+      @touchend="onTouchEnd"
+    />
     <button v-if="images.length > 1" class="lb-nav next" @click.stop="step(1)">›</button>
     <div v-if="images.length > 1" class="lb-count">{{ idx + 1 }} / {{ images.length }}</div>
   </div>
@@ -21,6 +26,17 @@ const idx = ref(props.start)
 
 function step(d) {
   idx.value = (idx.value + d + props.images.length) % props.images.length
+}
+
+let touchX = null
+function onTouchStart(e) {
+  touchX = e.changedTouches[0].clientX
+}
+function onTouchEnd(e) {
+  if (touchX === null) return
+  const dx = e.changedTouches[0].clientX - touchX
+  touchX = null
+  if (Math.abs(dx) > 40 && props.images.length > 1) step(dx > 0 ? -1 : 1)
 }
 
 function onKey(e) {

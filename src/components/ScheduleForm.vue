@@ -15,8 +15,11 @@
             <input v-model="endAt" class="field" type="datetime-local" required />
           </div>
         </div>
-        <label>備註（選填）</label>
-        <input v-model="note" class="field" maxlength="100" />
+        <label>行程說明（選填，會顯示在行程卡上）</label>
+        <textarea
+          v-model="note" class="field note-area" maxlength="500" rows="3"
+          placeholder="例如：記得帶車票、到了打給我"
+        />
 
         <label>附件（圖片或檔案，單檔 10MB 內）</label>
         <div class="att-list">
@@ -156,6 +159,7 @@ label { display: block; font-size: 13px; color: var(--text-mid); margin: 14px 0 
 }
 .att-chip button:hover { color: #fca5a5; }
 .add-file { font-size: 12px; padding: 6px 12px; }
+.note-area { resize: vertical; min-height: 70px; line-height: 1.5; }
 .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
 .error { margin-top: 12px; font-size: 13px; color: #fca5a5; }
 @media (max-width: 460px) { .row { grid-template-columns: 1fr; } }

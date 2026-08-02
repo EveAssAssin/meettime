@@ -185,7 +185,7 @@
         :schedules="store.schedules"
         :members="store.members"
         :me-id="store.me?.id"
-        @remove="store.removeSchedule"
+        @remove="confirmRemove"
         @edit="openEdit"
         @toggle-complete="store.toggleComplete"
         @attach="openScheduleAttach"
@@ -442,6 +442,12 @@ async function join() {
 
 function onSave(payload) {
   store.saveSchedule(payload).then(payload.resolve, payload.reject)
+}
+
+function confirmRemove(item) {
+  if (confirm(`確定要刪除行程「${item.title}」嗎？\n照片與附件會一併刪除，無法復原。`)) {
+    store.removeSchedule(item.id)
+  }
 }
 
 function openEdit(schedule) {

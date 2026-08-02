@@ -24,50 +24,44 @@
             :style="{ '--c': memberColor(item.member_id) }"
           >
             <div class="ev-main">
-            <div class="name">
-              <button
-                v-if="meId"
-                class="check" :class="{ checked: item.completed_at }"
-                :title="item.completed_at ? '取消完成' : '標記完成'"
-                @click="$emit('toggle-complete', item)"
-              >{{ item.completed_at ? '✓' : '' }}</button>
-              <span v-else-if="item.completed_at" class="check checked static">✓</span>
-              <span class="name-text">{{ item.title }}</span>
-              <span v-if="item.completed_at" class="badge done-badge">
-                ✓ {{ memberName(item.completed_by) }} 達成
-              </span>
-              <span v-else-if="isLive(item)" class="badge">進行中</span>
-            </div>
-            <div v-if="fileList(item).length" class="atts">
-              <a
-                v-for="a in fileList(item)" :key="a.id"
-                :href="a.file_url" target="_blank" rel="noopener" class="file-chip"
-              >📎 {{ a.file_name }}</a>
-            </div>
-            <div class="reactions">
-              <button
-                v-for="e in EMOJIS" :key="e"
-                class="react"
-                :class="{ mine: mineReacted(item, e), has: reactCount(item, e) > 0 }"
-                :disabled="!meId"
-                @click="$emit('react', item, e)"
-              >{{ e }}<span v-if="reactCount(item, e)" class="rc">{{ reactCount(item, e) }}</span></button>
-            </div>
-            <div class="who">
-              {{ memberName(item.member_id) }}
-              <button v-if="meId" class="del" @click="$emit('attach', item)">📷 傳照片</button>
-              <button v-if="meId" class="del" @click="$emit('alarm', item)">⏰ 鬧鐘</button>
-              <button
-                v-if="meId" class="del timer-toggle" :class="{ on: item.show_timer }"
-                :title="item.show_timer ? '小組件倒數：開' : '小組件倒數：關'"
-                @click="$emit('toggle-timer', item)"
-              >⏱ {{ item.show_timer ? '倒數開' : '倒數關' }}</button>
-              <button v-if="hasImages(item)" class="del" @click="$emit('share', item)">✨ 美照</button>
-              <template v-if="item.member_id === meId">
-                <button class="del" @click="$emit('edit', item)">編輯</button>
-                <button class="del" @click="$emit('remove', item.id)">刪除</button>
-              </template>
-            </div>
+              <div class="name">
+                <button
+                  v-if="meId"
+                  class="check" :class="{ checked: item.completed_at }"
+                  :title="item.completed_at ? '取消完成' : '標記完成'"
+                  @click="$emit('toggle-complete', item)"
+                >{{ item.completed_at ? '✓' : '' }}</button>
+                <span v-else-if="item.completed_at" class="check checked static">✓</span>
+                <span class="name-text">{{ item.title }}</span>
+                <span v-if="item.completed_at" class="badge done-badge">
+                  ✓ {{ memberName(item.completed_by) }} 達成
+                </span>
+                <span v-else-if="isLive(item)" class="badge">進行中</span>
+              </div>
+              <p v-if="item.note" class="ev-note">{{ item.note }}</p>
+              <div v-if="fileList(item).length" class="atts">
+                <a
+                  v-for="a in fileList(item)" :key="a.id"
+                  :href="a.file_url" target="_blank" rel="noopener" class="file-chip"
+                >📎 {{ a.file_name }}</a>
+              </div>
+              <div class="reactions">
+                <button
+                  v-for="e in EMOJIS" :key="e"
+                  class="react"
+                  :class="{ mine: mineReacted(item, e), has: reactCount(item, e) > 0 }"
+                  :disabled="!meId"
+                  @click="$emit('react', item, e)"
+                >{{ e }}<span v-if="reactCount(item, e)" class="rc">{{ reactCount(item, e) }}</span></button>
+              </div>
+              <div class="foot">
+                <span class="who">{{ memberName(item.member_id) }}</span>
+                <span v-if="item.show_timer" class="timer-flag" title="小組件倒數已開啟">⏱</span>
+                <button
+                  v-if="meId" class="menu-btn" :class="{ active: menuId === item.id }"
+                  @click.stop="menuId = menuId === item.id ? null : item.id"
+                >⋯</button>
+              </div>
             </div>
             <div
               v-if="hasImages(item)" class="ev-photos"
@@ -75,6 +69,19 @@
             >
               <img :src="imageList(item)[0].file_url" :alt="imageList(item)[0].file_name" />
               <span v-if="imageList(item).length > 1" class="more">+{{ imageList(item).length - 1 }}</span>
+            </div>
+
+            <div v-if="menuId === item.id" class="menu" @click.stop>
+              <button @click="act('attach', item)">📷 傳照片</button>
+              <button v-if="hasImages(item)" @click="act('share', item)">✨ 做成美照</button>
+              <button @click="act('alarm', item)">⏰ 設鬧鐘</button>
+              <button @click="act('toggle-timer', item)">
+                ⏱ 小組件倒數：{{ item.show_timer ? '開 → 關' : '關 → 開' }}
+              </button>
+              <template v-if="item.member_id === meId">
+                <button @click="act('edit', item)">✏️ 編輯行程</button>
+                <button class="danger" @click="act('remove', item)">🗑 刪除行程</button>
+              </template>
             </div>
           </div>
         </div>
@@ -92,9 +99,20 @@ const props = defineProps({
   members: { type: Array, default: () => [] },
   meId: String,
 })
-defineEmits(['remove', 'edit', 'toggle-complete', 'attach', 'react', 'preview', 'share', 'quick-add', 'alarm', 'toggle-timer'])
+const emit = defineEmits(['remove', 'edit', 'toggle-complete', 'attach', 'react', 'preview', 'share', 'quick-add', 'alarm', 'toggle-timer'])
 
 const EMOJIS = ['❤️', '👍', '😂', '🎉', '😭']
+const menuId = ref(null)
+
+function act(evt, item) {
+  menuId.value = null
+  emit(evt, item)
+}
+
+function closeMenu() {
+  menuId.value = null
+}
+
 const isImage = (t) => t && t.startsWith('image/')
 const imageList = (item) => (item.attachments || []).filter((a) => isImage(a.file_type))
 const fileList = (item) => (item.attachments || []).filter((a) => !isImage(a.file_type))
@@ -105,14 +123,19 @@ const mineReacted = (item, e) =>
 
 const now = ref(Date.now())
 let timer
-onMounted(() => { timer = setInterval(() => { now.value = Date.now() }, 30000) })
-onUnmounted(() => clearInterval(timer))
+onMounted(() => {
+  timer = setInterval(() => { now.value = Date.now() }, 30000)
+  document.addEventListener('click', closeMenu)
+})
+onUnmounted(() => {
+  clearInterval(timer)
+  document.removeEventListener('click', closeMenu)
+})
 
 const nowText = computed(() => dayjs(now.value).format('HH:mm'))
 const fmt = (d) => dayjs(d).format('HH:mm')
 
 const isLive = (s) => now.value >= +new Date(s.start_at) && now.value < +new Date(s.end_at)
-
 const memberColor = (id) => props.members.find((m) => m.id === id)?.color || 'var(--accent)'
 const memberName = (id) => props.members.find((m) => m.id === id)?.nickname || '?'
 
@@ -154,7 +177,7 @@ const groups = computed(() => {
 </script>
 
 <style scoped>
-.timeline { padding: 22px 20px; }
+.timeline { padding: 22px 20px; overflow: visible; }
 .empty { text-align: center; color: var(--text-lo); font-size: 14px; padding: 12px 0; }
 .day { font-size: 13px; color: var(--text-lo); letter-spacing: 1px; margin: 14px 0 10px; }
 .day:first-child { margin-top: 4px; }
@@ -165,11 +188,14 @@ const groups = computed(() => {
   background: var(--glass-bg); border: 1px solid var(--glass-border);
   border-left: 3px solid var(--c); border-top-left-radius: 0; border-bottom-left-radius: 0;
   display: flex; gap: 12px; align-items: flex-start;
+  position: relative;
 }
 .ev-main { flex: 1; min-width: 0; }
-.ev-photos {
-  position: relative; flex-shrink: 0; cursor: zoom-in; align-self: center;
+.ev-note {
+  font-size: 13px; color: var(--text-mid); line-height: 1.55;
+  margin: 6px 0 2px; white-space: pre-wrap; word-break: break-word;
 }
+.ev-photos { position: relative; flex-shrink: 0; cursor: zoom-in; align-self: center; }
 .ev-photos img {
   width: 74px; height: 74px; object-fit: cover; border-radius: 10px;
   border: 1px solid var(--glass-border); display: block;
@@ -190,25 +216,25 @@ const groups = computed(() => {
 .check:hover { border-color: var(--accent); }
 .check.checked { background: #22c55e; border-color: #22c55e; }
 .check.static { cursor: default; }
-.event.done { opacity: 0.8; }
+.event.done { opacity: 0.85; }
 .event.done .name-text { text-decoration: line-through; text-decoration-thickness: 1.5px; }
-.done-badge {
-  background: rgba(34,197,94,0.28) !important;
-  animation: none !important;
-}
-.event .who { font-size: 12px; color: var(--text-lo); margin-top: 2px; display: flex; align-items: center; gap: 8px; }
-.event.live { box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 30%, transparent); }
+.done-badge { background: rgba(34,197,94,0.28) !important; animation: none !important; }
 .badge {
   display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 30%, transparent);
-  color: var(--text-hi); margin-left: 6px; animation: pulse 1.6s ease-in-out infinite;
+  color: var(--text-hi); animation: pulse 1.6s ease-in-out infinite;
 }
 @keyframes pulse { 50% { opacity: 0.5; } }
+.event.live { box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 30%, transparent); }
 .atts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.thumb {
-  width: 56px; height: 56px; object-fit: cover; border-radius: 8px;
-  border: 1px solid var(--glass-border); display: block; cursor: zoom-in;
+.file-chip {
+  display: inline-flex; align-items: center; font-size: 12px;
+  padding: 5px 10px; border-radius: 999px; max-width: 200px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  color: var(--text-mid); text-decoration: none;
 }
+.file-chip:hover { color: var(--text-hi); }
 .reactions { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
 .react {
   background: none; border: 1px solid transparent; border-radius: 999px;
@@ -221,21 +247,31 @@ const groups = computed(() => {
 .react:hover:not(:disabled) { opacity: 1; transform: scale(1.1); }
 .react:disabled { cursor: default; }
 .rc { font-size: 11px; font-weight: 600; }
-.file-chip {
-  display: inline-flex; align-items: center; font-size: 12px;
-  padding: 5px 10px; border-radius: 999px; max-width: 200px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.foot { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.who { font-size: 12px; color: var(--text-lo); }
+.timer-flag { font-size: 12px; }
+.menu-btn {
+  margin-left: auto; width: 30px; height: 26px; border-radius: 8px;
   background: var(--glass-bg); border: 1px solid var(--glass-border);
-  color: var(--text-mid); text-decoration: none;
+  color: var(--text-mid); font-size: 16px; line-height: 1; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
 }
-.file-chip:hover { color: var(--text-hi); }
-.del {
-  background: none; border: none; color: var(--text-lo); font-size: 11px;
-  cursor: pointer; text-decoration: underline; padding: 0; font-family: inherit;
+.menu-btn:hover, .menu-btn.active { color: var(--text-hi); border-color: var(--accent); }
+.menu {
+  position: absolute; right: 10px; top: 38px; z-index: 6;
+  display: flex; flex-direction: column; min-width: 190px;
+  background: color-mix(in srgb, var(--page-bg) 88%, #ffffff 6%);
+  border: 1px solid var(--glass-border); border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+  overflow: hidden; padding: 4px;
 }
-.del:hover { color: #fca5a5; }
-.timer-toggle.on { color: var(--accent); font-weight: 600; }
-.timer-toggle.on:hover { color: var(--accent); }
+.menu button {
+  background: none; border: none; color: var(--text-hi);
+  font-size: 14px; font-family: inherit; text-align: left;
+  padding: 10px 14px; border-radius: 10px; cursor: pointer;
+}
+.menu button:hover { background: var(--glass-bg); }
+.menu .danger { color: #fca5a5; }
 .gap-row { display: grid; grid-template-columns: 86px 1fr; gap: 12px; margin: 2px 0 10px; }
 .gap-btn {
   border: 1px dashed var(--glass-border); background: none; border-radius: 10px;
