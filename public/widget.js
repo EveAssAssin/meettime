@@ -78,17 +78,25 @@ async function makeWidget(roomCode) {
     if (currentSched) {
       w.addSpacer(5)
       const remainMin = Math.max(0, Math.round((new Date(currentSched.end_at) - new Date()) / 60000))
-      const c = w.addText("▶ " + (currentSched.completed_at ? "✓ " : "") + currentSched.title +
-        " " + hm(currentSched.start_at) + "–" + hm(currentSched.end_at) + "（剩 " + remainMin + " 分）")
-      c.font = Font.mediumSystemFont(11)
-      c.textColor = new Color("#7dd3fc", 0.95)
+      const c = w.addText("▶ " + (currentSched.completed_at ? "✓ " : "") + currentSched.title)
+      c.font = Font.semiboldSystemFont(15)
+      c.textColor = new Color("#7dd3fc", 0.98)
       c.lineLimit = 1
+      c.minimumScaleFactor = 0.7
+      const c2 = w.addText(hm(currentSched.start_at) + "–" + hm(currentSched.end_at) + "・剩 " + remainMin + " 分")
+      c2.font = Font.mediumSystemFont(12)
+      c2.textColor = new Color("#7dd3fc", 0.7)
+      c2.lineLimit = 1
     } else if (nextSched) {
       w.addSpacer(5)
-      const c = w.addText("接下來 " + hm(nextSched.start_at) + " " + nextSched.title)
-      c.font = Font.systemFont(11)
-      c.textColor = new Color("#ffffff", 0.6)
+      const c = w.addText("接下來 " + nextSched.title)
+      c.font = Font.semiboldSystemFont(15)
+      c.textColor = new Color("#ffffff", 0.85)
       c.lineLimit = 1
+      c.minimumScaleFactor = 0.7
+      const c2 = w.addText(hm(nextSched.start_at) + " 開始")
+      c2.font = Font.mediumSystemFont(12)
+      c2.textColor = new Color("#ffffff", 0.55)
     }
     w.url = "https://meettime.onrender.com/r/" + roomCode.toUpperCase()
   } else {

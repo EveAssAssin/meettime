@@ -605,10 +605,9 @@ header { display: flex; align-items: center; justify-content: space-between; mar
 .date { margin-top: 20px; font-size: 13px; color: var(--text-mid); }
 .live-card {
   padding: 16px 18px; margin: 20px 0 4px;
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 14px; flex-wrap: wrap;
+  display: flex; flex-direction: column; gap: 14px;
 }
-.live-info { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.live-info { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; min-width: 0; }
 .live-tag {
   font-size: 12px; font-weight: 700; color: var(--accent);
   padding: 3px 10px; border-radius: 999px;
@@ -634,18 +633,16 @@ header { display: flex; align-items: center; justify-content: space-between; mar
 .ios-help ol { padding-left: 20px; font-size: 14px; line-height: 2; color: var(--text-mid); }
 .ios-help b { color: var(--text-hi); }
 .ios-help .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
-.live-actions { display: flex; gap: 10px; flex: 1; justify-content: flex-end; min-width: 200px; }
+.live-actions { display: flex; gap: 10px; width: 100%; }
 .live-btn {
-  padding: 12px 18px; border-radius: 14px; font-size: 15px; font-weight: 600;
+  padding: 13px 16px; border-radius: 14px; font-size: 15px; font-weight: 600;
   background: var(--glass-bg); border: 1px solid var(--glass-border);
   color: var(--text-hi); cursor: pointer; font-family: inherit; transition: 0.15s;
+  white-space: nowrap; flex: 1;
 }
+.live-btn:last-child { flex: 0 0 auto; }
 .live-btn:active { transform: scale(0.96); }
 .check-btn.checked { background: rgba(34,197,94,0.3); border-color: rgba(34,197,94,0.6); }
-@media (max-width: 520px) {
-  .live-actions { min-width: 0; width: 100%; }
-  .live-btn { flex: 1; padding: 14px 10px; }
-}
 .section-title { display: flex; align-items: center; justify-content: space-between; margin: 26px 4px 12px; flex-wrap: wrap; gap: 8px; }
 .section-title h2 { font-size: 15px; font-weight: 600; color: var(--text-mid); letter-spacing: 1px; }
 .section-actions { display: flex; gap: 8px; }
