@@ -56,6 +56,7 @@
             <div class="who">
               {{ memberName(item.member_id) }}
               <button v-if="meId" class="del" @click="$emit('attach', item)">📷 傳照片</button>
+              <button v-if="meId" class="del" @click="$emit('alarm', item)">⏰ 鬧鐘</button>
               <button v-if="hasImages(item)" class="del" @click="$emit('share', item)">✨ 美照</button>
               <template v-if="item.member_id === meId">
                 <button class="del" @click="$emit('edit', item)">編輯</button>
@@ -86,7 +87,7 @@ const props = defineProps({
   members: { type: Array, default: () => [] },
   meId: String,
 })
-defineEmits(['remove', 'edit', 'toggle-complete', 'attach', 'react', 'preview', 'share', 'quick-add'])
+defineEmits(['remove', 'edit', 'toggle-complete', 'attach', 'react', 'preview', 'share', 'quick-add', 'alarm'])
 
 const EMOJIS = ['❤️', '👍', '😂', '🎉', '😭']
 const isImage = (t) => t && t.startsWith('image/')

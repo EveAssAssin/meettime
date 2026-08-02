@@ -150,8 +150,26 @@
           <button class="live-btn" :disabled="uploading" @click="openScheduleAttach(quickSchedule.s)">
             {{ uploading ? '…' : '📷 傳照片' }}
           </button>
+          <button class="live-btn" @click="setAlarm(quickSchedule.s, quickSchedule.live)">⏰</button>
         </div>
       </section>
+
+      <div v-if="showIosHelp" class="overlay" @click.self="showIosHelp = false">
+        <section class="glass ios-help">
+          <h3>⏰ iPhone 鬧鐘設定（只需做一次）</h3>
+          <ol>
+            <li>打開「捷徑」App → 右上「＋」新增捷徑</li>
+            <li>捷徑名稱改為：<b>MeetTime鬧鐘</b></li>
+            <li>加入動作「<b>建立鬧鐘</b>」（時鐘）</li>
+            <li>點動作裡的「時間」→ 選變數「<b>捷徑輸入</b>」</li>
+            <li>完成！以後點 ⏰ 就會自動設鬧鐘</li>
+          </ol>
+          <div class="actions">
+            <button class="pill" @click="showIosHelp = false">關閉</button>
+            <button class="pill primary" @click="runIosShortcut">我設好了，執行 →</button>
+          </div>
+        </section>
+      </div>
 
       <div class="section-title">
         <h2>{{ store.journeyDone ? '旅程紀錄' : '等待的行程' }}</h2>
@@ -173,6 +191,7 @@
         @preview="openLightbox"
         @share="shareTarget = $event"
         @quick-add="onQuickAdd"
+        @alarm="onScheduleAlarm"
       />
       <input ref="schedAttInput" type="file" accept="image/*,*/*" multiple hidden @change="onSchedAttPick" />
 
@@ -226,6 +245,7 @@ import { useRoute } from 'vue-router'
 import { useRoomStore } from '../stores/room'
 import { useAuthStore } from '../stores/auth'
 import { dayjs } from '../lib/time'
+import { platform, androidAlarmUrl, iosShortcutUrl, downloadIcs } from '../lib/alarm'
 import BigTimer from '../components/BigTimer.vue'
 import ThemePicker from '../components/ThemePicker.vue'
 import Timeline from '../components/Timeline.vue'
@@ -301,6 +321,40 @@ function fmtDur(ms) {
   if (h > 0) return `${h} 時 ${m} 分`
   if (m > 0) return `${m} 分 ${String(s).padStart(2, '0')} 秒`
   return `${s} 秒`
+}
+
+const showIosHelp = ref(false)
+const pendingAlarm = ref(null)
+
+function setAlarm(s, live) {
+  const time = live ? s.end_at : s.start_at
+  const label = `MeetTime：${s.title}`
+  const p = platform()
+  if (p === 'android') {
+    location.href = androidAlarmUrl(time, label)
+  } else if (p === 'ios') {
+    pendingAlarm.value = { time, label }
+    if (localStorage.getItem('meettime:ios-shortcut-ready')) {
+      location.href = iosShortcutUrl(time, label)
+    } else {
+      showIosHelp.value = true
+    }
+  } else {
+    downloadIcs(time, live ? null : s.end_at, label)
+  }
+}
+
+function onScheduleAlarm(s) {
+  const live = Date.now() >= +new Date(s.start_at) && Date.now() < +new Date(s.end_at)
+  setAlarm(s, live)
+}
+
+function runIosShortcut() {
+  localStorage.setItem('meettime:ios-shortcut-ready', '1')
+  showIosHelp.value = false
+  if (pendingAlarm.value) {
+    location.href = iosShortcutUrl(pendingAlarm.value.time, pendingAlarm.value.label)
+  }
 }
 
 const quickRemainText = computed(() => {
@@ -570,6 +624,16 @@ header { display: flex; align-items: center; justify-content: space-between; mar
   font-size: 13px; font-weight: 700; color: var(--accent);
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
+.overlay {
+  position: fixed; inset: 0; z-index: 15;
+  background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.ios-help { max-width: 380px; width: 100%; padding: 24px; }
+.ios-help h3 { font-size: 16px; margin-bottom: 12px; }
+.ios-help ol { padding-left: 20px; font-size: 14px; line-height: 2; color: var(--text-mid); }
+.ios-help b { color: var(--text-hi); }
+.ios-help .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
 .live-actions { display: flex; gap: 10px; flex: 1; justify-content: flex-end; min-width: 200px; }
 .live-btn {
   padding: 12px 18px; border-radius: 14px; font-size: 15px; font-weight: 600;
